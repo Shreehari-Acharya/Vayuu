@@ -30,7 +30,7 @@ func (h *Handler) HandleMessage(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	
 	aiCtx, aiCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	response, err := h.AI.Ask(aiCtx, userText, history)
+	response, err := h.AI.Ask(aiCtx, history)
 	aiCancel()
 
 	h.STM.Add("assistant", response)

@@ -7,5 +7,5 @@ import (
 )
 
 type AIService interface {
-	Ask(ctx context.Context, nextQuery string, history []memory.Message) (string, error)
+	Ask(ctx context.Context, history []memory.Message) (string, error)
 }

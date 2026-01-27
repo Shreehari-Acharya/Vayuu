@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	// "encoding/json"
 	"github.com/Shreehari-Acharya/vayuu/internal/memory"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -21,7 +22,7 @@ func NewGroq(apiKey string) (*GroqClient, error) {
 }
 
 // Ask implements the AIService interface
-func (g *GroqClient) Ask(ctx context.Context, nextQuery string, history []memory.Message) (string, error) {
+func (g *GroqClient) Ask(ctx context.Context, history []memory.Message) (string, error) {
 	
 	messages := []openai.ChatCompletionMessageParamUnion{
 		openai.SystemMessage(systemPrompt),
@@ -35,6 +36,10 @@ func (g *GroqClient) Ask(ctx context.Context, nextQuery string, history []memory
             messages = append(messages, openai.AssistantMessage(msg.Content))
         }
     }
+
+	// uncomment to debug full payload
+	// jsonData, _ := json.MarshalIndent(messages, "", "  ")
+	// fmt.Printf("FULL API PAYLOAD:\n%s\n", string(jsonData))
 
 	chatCompletion, err := g.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: messages,

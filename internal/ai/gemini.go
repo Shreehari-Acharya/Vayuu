@@ -21,7 +21,7 @@ func NewGemini(apiKey string) (*Client, error) {
 	return &Client{genaiClient: client}, nil
 }
 
-func (c *Client) Ask(ctx context.Context, userQuery string, history []memory.Message) (string, error) {
+func (c *Client) Ask(ctx context.Context, history []memory.Message) (string, error) {
 
 	var messages []*genai.Content
 
@@ -39,7 +39,7 @@ func (c *Client) Ask(ctx context.Context, userQuery string, history []memory.Mes
     }
 
 	config := &genai.GenerateContentConfig{
-		SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleUser),
+		SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleModel),
 	}
 	result, err := c.genaiClient.Models.GenerateContent(
 		ctx,
