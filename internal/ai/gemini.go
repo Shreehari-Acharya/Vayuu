@@ -3,6 +3,8 @@ package ai
 import (
 	"context"
 	"fmt"
+
+	"github.com/Shreehari-Acharya/vayuu/internal/memory"
 	"google.golang.org/genai"
 )
 
@@ -19,7 +21,22 @@ func NewGemini(apiKey string) (*Client, error) {
 	return &Client{genaiClient: client}, nil
 }
 
-func (c *Client) Ask(ctx context.Context, prompt string) (string, error) {
+func (c *Client) Ask(ctx context.Context, userQuery string, history []memory.Message) (string, error) {
+
+	var messages []*genai.Content
+
+	for _, msg := range history {
+        role := "user"
+        if msg.Role == "assistant" {
+            role = "model"
+        }
+        messages = append(messages, &genai.Content{
+            Role: role,
+            Parts: []*genai.Part{
+                {Text: msg.Content},
+            },
+        })
+    }
 
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleUser),
@@ -27,7 +44,7 @@ func (c *Client) Ask(ctx context.Context, prompt string) (string, error) {
 	result, err := c.genaiClient.Models.GenerateContent(
 		ctx,
 		"gemini-2.0-flash",
-		genai.Text(prompt),
+		messages,
 		config,
 	)
 

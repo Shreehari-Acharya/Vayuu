@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"github.com/Shreehari-Acharya/vayuu/internal/memory"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
@@ -20,12 +21,23 @@ func NewGroq(apiKey string) (*GroqClient, error) {
 }
 
 // Ask implements the AIService interface
-func (g *GroqClient) Ask(ctx context.Context, prompt string) (string, error) {
+func (g *GroqClient) Ask(ctx context.Context, nextQuery string, history []memory.Message) (string, error) {
+	
+	messages := []openai.ChatCompletionMessageParamUnion{
+		openai.SystemMessage(systemPrompt),
+	}
+
+	for _, msg := range history {
+        switch msg.Role {
+		case "user":
+            messages = append(messages, openai.UserMessage(msg.Content))
+        case "assistant":
+            messages = append(messages, openai.AssistantMessage(msg.Content))
+        }
+    }
+
 	chatCompletion, err := g.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.UserMessage(prompt),
-			openai.SystemMessage(systemPrompt),
-		},
+		Messages: messages,
 		Model: "openai/gpt-oss-120b",
 	})
 	if err != nil {

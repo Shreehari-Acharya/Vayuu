@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"time"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
@@ -10,11 +11,13 @@ import (
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/Shreehari-Acharya/vayuu/internal/ai"
 	"github.com/Shreehari-Acharya/vayuu/internal/bot"
+	"github.com/Shreehari-Acharya/vayuu/internal/memory"
 )
 
 func main() {
 	cfg := config.Get()
     var aiService ai.AIService
+	var ShortTermMemory = memory.NewSTM(20)
     var err error
 	// Initialize AI
 	if cfg.UseGroq {
@@ -30,7 +33,10 @@ func main() {
     }
 
 	// Initialize Handlers
-	h := &bot.Handler{AI: aiService}
+	h := &bot.Handler{
+		STM: ShortTermMemory,
+		AI: aiService,
+	}
 
 	// Initialize Telegram
 	b, err := gotgbot.NewBot(cfg.TelegramToken, nil)
