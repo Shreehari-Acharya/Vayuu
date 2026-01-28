@@ -1,10 +1,9 @@
-package ai
+package aiclient
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/Shreehari-Acharya/vayuu/internal/memory"
 	"google.golang.org/genai"
 )
 
@@ -21,22 +20,25 @@ func NewGemini(apiKey string) (*Client, error) {
 	return &Client{genaiClient: client}, nil
 }
 
-func (c *Client) Ask(ctx context.Context, history []memory.Message) (string, error) {
+// Ask implements the AIService interface
+func (c *Client) Ask(ctx context.Context, history []ChatMessage) (string, error) {
 
-	var messages []*genai.Content
+	// Pre-allocate with exact capacity
+	messages := make([]*genai.Content, 0, len(history))
 
-	for _, msg := range history {
-        role := "user"
-        if msg.Role == "assistant" {
-            role = "model"
-        }
-        messages = append(messages, &genai.Content{
-            Role: role,
-            Parts: []*genai.Part{
-                {Text: msg.Content},
-            },
-        })
-    }
+	for i := range history {
+		// Use index to avoid copying ChatMessage
+		role := "user"
+		if history[i].Role == "assistant" {
+			role = "model"
+		}
+		messages = append(messages, &genai.Content{
+			Role: role,
+			Parts: []*genai.Part{
+				{Text: history[i].Content},
+			},
+		})
+	}
 
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleModel),
