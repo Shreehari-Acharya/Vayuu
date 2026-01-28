@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	defaultAITimeout     = 30 * time.Second
-	defaultSendTimeout   = 15 * time.Second
+	defaultAITimeout   = 30 * time.Second
+	defaultSendTimeout = 15 * time.Second
 )
 
 // Handler handles Telegram bot commands and messages
 type Handler struct {
-	STM *memory.STM
-	AI  aiclient.AIService
+	STM          *memory.STM
+	AI           aiclient.AIService
 }
 
 // Start handles the /start command

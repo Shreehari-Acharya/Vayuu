@@ -30,7 +30,7 @@ func vayuu() error {
 	// Initialize memory
 	stm := memory.NewSTM(cfg.MemorySize)
 
-	// Initialize bot
+	// Initialize bot 
 	b, err := bot.Initialize(cfg.TelegramToken, aiService, stm)
 	if err != nil {
 		return err

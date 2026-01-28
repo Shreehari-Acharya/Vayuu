@@ -3,9 +3,11 @@ package aiclient
 import (
 	"context"
 	"fmt"
-
+	"encoding/json"
+	"log"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/shared"
 )
 
 type GroqClient struct {
@@ -49,4 +51,71 @@ func (g *GroqClient) Ask(ctx context.Context, history []ChatMessage) (string, er
 	}
 
 	return "Groq returned no response", nil
+}
+
+// AskWithTools function for tool calls
+func (g *GroqClient) AskWithTools(ctx context.Context, context string, tools []ToolDefinition) (AIResponse, error) {
+	// Implementation for tool calls can be added here
+	apiTools := make([]openai.ChatCompletionToolUnionParam, len(tools))
+	for i, tool := range tools {
+		apiTools[i] = openai.ChatCompletionToolUnionParam{
+			OfFunction: &openai.ChatCompletionFunctionToolParam{
+				Type: "function",
+				Function: shared.FunctionDefinitionParam{
+					Name:        tool.Name,
+					Parameters:  tool.InputSchema,
+					Description: openai.String(tool.Description),
+				},
+			},
+		}
+	}
+	chatCompletion, err := g.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(context),
+		},
+		Model: "openai/gpt-oss-120b",
+		Tools: apiTools,
+	})
+
+	if err != nil {
+		return AIResponse{}, fmt.Errorf("groq api error: %w", err)
+	}
+
+	if len(chatCompletion.Choices) > 0 {
+		choice := chatCompletion.Choices[0]
+
+		// 1. Check if there are tool calls
+		if len(choice.Message.ToolCalls) > 0 {
+			// 2. Pre-allocate the slice for better performance
+			myToolCalls := make([]ToolCall, 0, len(choice.Message.ToolCalls))
+
+			// 3. Loop and convert
+			for _, tc := range choice.Message.ToolCalls {
+
+				var argsMap map[string]interface{}
+
+				// Convert the string into a map
+				err := json.Unmarshal([]byte(tc.Function.Arguments), &argsMap)
+				if err != nil {
+					// Handle cases where the AI hallucinates invalid JSON
+					log.Printf("AI generated invalid JSON: %v", err)
+					continue
+				}
+				myToolCalls = append(myToolCalls, ToolCall{
+					Name:      tc.Function.Name,      // Access via .Function
+					Arguments: argsMap, // Use the unmarshaled map
+				})
+			}
+			return AIResponse{
+				Content:   choice.Message.Content,
+				ToolCalls: myToolCalls,
+			}, nil
+		}
+		return AIResponse{
+			Content:   choice.Message.Content,
+			ToolCalls: nil,
+		}, nil
+	}
+
+	return AIResponse{}, fmt.Errorf("Groq returned no response")
 }
