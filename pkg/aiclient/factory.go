@@ -1,17 +1,16 @@
 package aiclient
 
-import "fmt"
+// Config holds configuration for creating an AI client.
+type Config struct {
+	UseGroq   bool
+	GroqKey   string
+	GeminiKey string
+}
 
-// NewAIService creates an AI service based on the provider type
-func NewAIService(useGroq bool, groqKey, geminiKey string) (AIService, error) {
-	if useGroq {
-		if groqKey == "" {
-			return nil, fmt.Errorf("groq key is required")
-		}
-		return NewGroq(groqKey)
+// New creates an appropriate AI client based on the configuration.
+func New(cfg Config) (Client, error) {
+	if cfg.UseGroq {
+		return NewGroq(cfg.GroqKey)
 	}
-	if geminiKey == "" {
-		return nil, fmt.Errorf("gemini key is required")
-	}
-	return NewGemini(geminiKey)
+	return NewGemini(cfg.GeminiKey)
 }

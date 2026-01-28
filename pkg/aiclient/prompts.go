@@ -1,6 +1,7 @@
 package aiclient
 
-var systemPrompt = `
+// SystemPrompt defines the behavior and personality of the AI assistant.
+const SystemPrompt = `
 Role: You are an AI assistant named Vayuu designed to help the user.
 Answer using simple markdown formatting. only use bold, italics, links, codeblock,
 codeblock with language, block quotes, and inline code.

@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
@@ -14,48 +15,46 @@ import (
 	"github.com/Shreehari-Acharya/vayuu/pkg/aiclient"
 )
 
+// Bot represents the Telegram bot instance.
 type Bot struct {
 	bot     *gotgbot.Bot
 	updater *ext.Updater
-	handler *Handler
 }
 
-// Initialize sets up the Telegram bot with the provided token, AI service, and short-term memory.
-func Initialize(token string, ai aiclient.AIService, stm *memory.STM) (*Bot, error) {
-	b, err := gotgbot.NewBot(token, nil)
+// New creates and initializes a new Telegram bot with the provided token and service.
+func New(token string, ai aiclient.Client, conversation *memory.Store) (*Bot, error) {
+	tgBot, err := gotgbot.NewBot(token, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// Store handler as pointer
-	handler := &Handler{
-		STM: stm,
-		AI:  ai,
-	}
+	// Create service and message handler
+	service := NewService(ai, conversation)
+	handler := NewMessageHandler(service)
 
+	// Setup dispatcher with command and message handlers
 	dispatcher := ext.NewDispatcher(nil)
-	dispatcher.AddHandler(handlers.NewCommand("start", handler.Start))
+	dispatcher.AddHandler(handlers.NewCommand("start", handler.HandleStart))
 	dispatcher.AddHandler(handlers.NewMessage(message.Text, handler.HandleMessage))
 
 	updater := ext.NewUpdater(dispatcher, nil)
 
 	return &Bot{
-		bot:     b,
+		bot:     tgBot,
 		updater: updater,
-		handler: handler,
 	}, nil
 }
 
-// Start begins polling for updates and handles graceful shutdown on interrupt signals.
+// Start begins polling for updates and handles graceful shutdown.
 func (b *Bot) Start() error {
-	log.Println("Bot is starting...")
+	log.Println("bot starting...")
 
 	err := b.updater.StartPolling(b.bot, &ext.PollingOpts{
 		DropPendingUpdates: true,
 		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
 			Timeout: 30,
 			RequestOpts: &gotgbot.RequestOpts{
-				Timeout: time.Second * 50,
+				Timeout: 50 * time.Second,
 			},
 		},
 	})
@@ -63,15 +62,16 @@ func (b *Bot) Start() error {
 		return err
 	}
 
-	log.Println("Bot is running. Press Ctrl+C to stop.")
+	log.Println("bot is running. press ctrl+c to stop")
 
+	// Wait for interrupt signal
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
 
-	log.Println("Shutting down bot...")
+	log.Println("shutting down bot...")
 	b.updater.Stop()
-	log.Println("Bot stopped gracefully")
+	log.Println("bot stopped gracefully")
 
 	return nil
 }

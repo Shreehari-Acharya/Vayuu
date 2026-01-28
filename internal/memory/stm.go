@@ -2,64 +2,67 @@ package memory
 
 import (
 	"sync"
+
 	"github.com/Shreehari-Acharya/vayuu/pkg/aiclient"
 )
 
-// STM (Short-Term Memory) manages conversation history
-type STM struct {
+// Store manages conversation history with a sliding window approach.
+// It is safe for concurrent use.
+type Store struct {
 	mu      sync.RWMutex
-	history []aiclient.ChatMessage
+	history []aiclient.Message
 	maxSize int
 }
 
-// NewSTM creates a new short-term memory with the specified size
-func NewSTM(maxSize int) *STM {
+// New creates a new conversation store with the specified maximum size.
+// If maxSize is <= 0, it defaults to 20.
+func New(maxSize int) *Store {
 	if maxSize <= 0 {
 		maxSize = 20
 	}
-	return &STM{
-		history: make([]aiclient.ChatMessage, 0, maxSize),
+	return &Store{
+		history: make([]aiclient.Message, 0, maxSize),
 		maxSize: maxSize,
 	}
 }
 
-// Add adds a message to the history
-func (s *STM) Add(role, content string) {
+// Add appends a message to the conversation history.
+// If the history exceeds maxSize, the oldest pair (user + assistant) is removed.
+func (s *Store) Add(role, content string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.history = append(s.history, aiclient.ChatMessage{
+	s.history = append(s.history, aiclient.Message{
 		Role:    role,
 		Content: content,
 	})
 
-	// Sliding window: remove oldest messages if exceeding max size
+	// Remove oldest pair if exceeding max size
 	if len(s.history) > s.maxSize {
-		// Remove oldest pair (user + assistant)
 		s.history = s.history[2:]
 	}
 }
 
-// GetHistory returns a copy of the conversation history
-func (s *STM) GetHistory() []aiclient.ChatMessage {
+// GetHistory returns a copy of the current conversation history.
+func (s *Store) GetHistory() []aiclient.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	history := make([]aiclient.ChatMessage, len(s.history))
+	history := make([]aiclient.Message, len(s.history))
 	copy(history, s.history)
 	return history
 }
 
-// Clear removes all messages from history
-func (s *STM) Clear() {
+// Clear removes all messages from the conversation history.
+func (s *Store) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.history = s.history[:0]
 }
 
-// Len returns the current number of messages in history
-func (s *STM) Len() int {
+// Len returns the current number of messages in the conversation history.
+func (s *Store) Len() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

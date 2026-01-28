@@ -1,39 +1,37 @@
 package aiclient
 
-import (
-	"context"
-)
+import "context"
 
-// ChatMessage represents a single message in a chat conversation.
-type ChatMessage struct {
+// Message represents a single message in a conversation.
+type Message struct {
 	Role    string
 	Content string
 }
 
-// ToolDefinition represents a tool that the AI can call
+// ToolDefinition defines a tool that an AI can invoke.
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	InputSchema map[string]interface{} `json:"input_schema"`
 }
 
-// ToolCall represents a tool call made by the AI
+// ToolCall represents a tool invocation made by the AI.
 type ToolCall struct {
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments"`
 }
 
-// AIResponse contains the AI's response and any tool calls
-type AIResponse struct {
+// Response contains the AI's reply and any tool calls.
+type Response struct {
 	Content   string
 	ToolCalls []ToolCall
 }
 
-// AIService defines the interface for an AI service.
-type AIService interface {
-	// Ask sends a message and returns the response
-	Ask(ctx context.Context, history []ChatMessage) (string, error)
+// Client defines the interface for communicating with an AI service.
+type Client interface {
+	// Complete sends a message and returns the response.
+	Complete(ctx context.Context, messages []Message) (string, error)
 
-	// AskWithTools sends a message with available tools and returns response + tool calls
-	AskWithTools(ctx context.Context, context string, tools []ToolDefinition) (AIResponse, error)
+	// CompleteWithTools sends a message with available tools and returns response + tool calls.
+	CompleteWithTools(ctx context.Context, systemPrompt string, tools []ToolDefinition) (Response, error)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/Shreehari-Acharya/vayuu/internal/bot"
 	"github.com/Shreehari-Acharya/vayuu/internal/memory"
@@ -9,33 +10,37 @@ import (
 )
 
 func main() {
-	if err := vayuu(); err != nil {
-		log.Fatalf("Application error: %v", err)
+	if err := run(); err != nil {
+		log.Fatalf("application error: %v", err)
 	}
 }
 
-func vayuu() error {
+// run initializes and starts the application.
+func run() error {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
 
-	// Initialize AI service
-	aiService, err := aiclient.NewAIService(cfg.UseGroq, cfg.GroqKey, cfg.GeminiKey)
+	// Create AI client
+	aiClient, err := aiclient.New(aiclient.Config{
+		UseGroq:   cfg.UseGroq,
+		GroqKey:   cfg.GroqKey,
+		GeminiKey: cfg.GeminiKey,
+	})
 	if err != nil {
 		return err
 	}
 
-	// Initialize memory
-	stm := memory.NewSTM(cfg.MemorySize)
+	// Create conversation store
+	conversationStore := memory.New(cfg.MemorySize)
 
-	// Initialize bot 
-	b, err := bot.Initialize(cfg.TelegramToken, aiService, stm)
+	// Create and start bot
+	bot, err := bot.New(cfg.TelegramToken, aiClient, conversationStore)
 	if err != nil {
 		return err
 	}
 
-	// Start bot with graceful shutdown
-	return b.Start()
+	return bot.Start()
 }
