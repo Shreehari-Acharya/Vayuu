@@ -6,6 +6,7 @@ import (
 
 	"github.com/Shreehari-Acharya/vayuu/main/agent"
 	"github.com/Shreehari-Acharya/vayuu/main/tools"
+	"github.com/Shreehari-Acharya/vayuu/main/prompts"
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -17,10 +18,13 @@ type App struct {
 
 func startTelegramBotWithAgent(ctx *context.Context, cfg *config.Config) {
 	app := &App{
-		agent: agent.NewAgent(systemPrompt, cfg),
+		agent: agent.NewAgent(prompts.GetSystemPrompt(), cfg),
 	}
 
-	app.agent.RegisterTool(tools.ExecuteCommandTool())
+	// Register all tools using a loop
+    for _, tool := range tools.GetAllTools() {
+        app.agent.RegisterTool(tool)
+    }
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(app.handler),
