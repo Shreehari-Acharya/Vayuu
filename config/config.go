@@ -15,6 +15,7 @@ type Config struct {
 	ApiBaseURL    string
 	Provider      string
 	MemorySize    int
+	Model         string
 }
 
 var (
@@ -34,6 +35,7 @@ func Load() (*Config, error) {
 			ApiKey:        os.Getenv("API_KEY"),
 			ApiBaseURL:    os.Getenv("API_BASE_URL"),
 			Provider:      os.Getenv("PROVIDER"),
+			Model:         os.Getenv("MODEL"),
 			MemorySize:    getEnvAsInt("MEMORY_SIZE", 20),
 		}
 
@@ -70,6 +72,10 @@ func (c *Config) validate() error {
 
 	if c.ApiBaseURL == "" {
 		return fmt.Errorf("API_BASE_URL is required")
+	}
+
+	if c.Model == "" {
+		return fmt.Errorf("MODEL is required")
 	}
 
 	if c.MemorySize <= 0 {

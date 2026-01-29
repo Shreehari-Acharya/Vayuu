@@ -9,10 +9,17 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
-func startTelegramBot(ctx *context.Context, cfg *config.Config) {
+type App struct {
+	agent *Agent
+}
+
+func startTelegramBotWithAgent(ctx *context.Context, cfg *config.Config) {
+	app := &App{
+		agent: NewAgent(systemPrompt, cfg),
+	}
 
 	opts := []bot.Option{
-		bot.WithDefaultHandler(onMessage),
+		bot.WithDefaultHandler(app.handler),
 	}
 
 	b, err := bot.New(cfg.TelegramToken, opts...)
@@ -23,24 +30,29 @@ func startTelegramBot(ctx *context.Context, cfg *config.Config) {
 	b.Start(*ctx)
 }
 
-func onMessage(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message != nil {
-		
-		// call agent with message text and chat id, and bot instance
-		// (why bot instance? to send message containing docs or other stuff)
-		// get response from agent
-		agentResponse := "This is a placeholder response from the agent."
-
-		// send response back to user
-		err := sendMessage(update.Message.Chat.ID, agentResponse, b, ctx)
-		if err != nil {
-			log.Printf("Failed to send message: %v", err)
-		}
+func (a* App) handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
 	}
+	agentResponse, err  := a.agent.runAgent(ctx, update.Message.Text)
+
+	if err != nil {
+		log.Printf("Error running agent: %v", err)
+		return
+	}
+
+	err = sendMessage(update.Message.Chat.ID, agentResponse, b, ctx)
+	if err != nil {
+		log.Printf("Error sending message: %v", err)
+	}	
 }
 
 func sendMessage(chatID int64, text string, b *bot.Bot, ctx context.Context) error {
+
+	text = bot.EscapeMarkdown(text)
+
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ParseMode: models.ParseModeMarkdown,
 		ChatID: chatID,
 		Text:   text,
 	})
