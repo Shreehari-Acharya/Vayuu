@@ -11,9 +11,9 @@ import (
 // Config holds all application configuration
 type Config struct {
 	TelegramToken string
-	GeminiKey     string
-	GroqKey       string
-	UseGroq       bool
+	ApiKey        string
+	ApiBaseURL    string
+	Provider      string
 	MemorySize    int
 }
 
@@ -31,9 +31,9 @@ func Load() (*Config, error) {
 
 		instance = &Config{
 			TelegramToken: os.Getenv("TELEGRAM_TOKEN"),
-			GeminiKey:     os.Getenv("GEMINI_API_KEY"),
-			GroqKey:       os.Getenv("GROQ_API_KEY"),
-			UseGroq:       os.Getenv("USE_GROQ") == "true",
+			ApiKey:        os.Getenv("API_KEY"),
+			ApiBaseURL:    os.Getenv("API_BASE_URL"),
+			Provider:      os.Getenv("PROVIDER"),
 			MemorySize:    getEnvAsInt("MEMORY_SIZE", 20),
 		}
 
@@ -60,14 +60,16 @@ func (c *Config) validate() error {
 		return fmt.Errorf("TELEGRAM_TOKEN is required")
 	}
 
-	if c.UseGroq {
-		if c.GroqKey == "" {
-			return fmt.Errorf("GROQ_API_KEY is required when USE_GROQ=true")
-		}
-	} else {
-		if c.GeminiKey == "" {
-			return fmt.Errorf("GEMINI_API_KEY is required when USE_GROQ=false")
-		}
+	if c.Provider == "" {
+		return fmt.Errorf("PROVIDER is required")
+	}
+
+	if c.ApiKey == "" {
+		return fmt.Errorf("API_KEY is required")
+	}
+
+	if c.ApiBaseURL == "" {
+		return fmt.Errorf("API_BASE_URL is required")
 	}
 
 	if c.MemorySize <= 0 {
