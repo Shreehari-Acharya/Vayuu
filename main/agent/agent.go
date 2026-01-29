@@ -1,11 +1,4 @@
-package main
-
-// create an agent instance
-// it uses llm and memory to respond to messages
-
-// function to create agent
-
-// function to handle incoming messages and respond using agentt
+package agent
 
 import (
 	"context"
@@ -20,7 +13,7 @@ import (
 type Agent struct {
 	client  *openai.Client
 	model   string
-	// tools   map[string]Tool
+	tools   map[string]Tool
 	messages []openai.ChatCompletionMessageParamUnion
 }
 
@@ -31,16 +24,21 @@ func NewAgent(systemPrompt string, cfg *config.Config) *Agent {
 	return &Agent{
 		client: llm,
 		model: cfg.Model,
-		// tools:  make(map[string]Tool),
+		tools: make(map[string]Tool),
 		messages: []openai.ChatCompletionMessageParamUnion{
 			systemMsg(systemPrompt),
 		},
 	}
 }
 
+func (a *Agent) RegisterTool(tool Tool) {
+	if a.tools == nil {
+		a.tools = make(map[string]Tool)
+	}
+	a.tools[tool.Name] = tool
+}
 
-
-func (a *Agent) runAgent(ctx context.Context, userInput string) (string, error) {
+func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) {
 
 	a.messages = append(a.messages, userMsg(userInput))
 	a.messages = trimMessages(a.messages)
@@ -49,10 +47,7 @@ func (a *Agent) runAgent(ctx context.Context, userInput string) (string, error) 
 		resp, err := a.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 			Model:    a.model,
 			Messages: a.messages,
-			// Enable tool calls
-			// Tools: []openai.ChatCompletionToolParam{
-				// Define tools here
-			// },
+			Tools: buildOpenAITools(a.tools),
 			MaxTokens: openai.Int(1000),
 		})
 		if err != nil {
@@ -62,36 +57,33 @@ func (a *Agent) runAgent(ctx context.Context, userInput string) (string, error) 
 		msg := resp.Choices[0].Message
 
 		if len(msg.ToolCalls) > 0 {
-			a.messages = append(a.messages, toolCallMsg(msg.Content))
+			a.messages = append(a.messages, assistantMsgFromResponse(msg))
 
 			for _, tc := range msg.ToolCalls {
-				// tool, ok := a.tools[tc.Function.Name]
-				// if !ok {
-				// 	return "", fmt.Errorf("unknown tool: %s", tc.Function.Name)
-				// }
+				tool, ok := a.tools[tc.Function.Name]
+				if !ok {
+					return "", fmt.Errorf("unknown tool: %s", tc.Function.Name)
+				}
 
 				var args map[string]any
 				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 					return "", err
 				}
 
-				// result, err := tool.Handler(args)
-				// if err != nil {
-				// 	return "", err
-				// }
+				result := tool.Handler(args)
 				// Append tool result back
-				// a.messages = append(a.messages, toolCallMsg(
-				// 	result,
-				// ))
+				a.messages = append(a.messages, toolCallMsg(
+					tc.ID,
+					result,
+				))
 			}
-
-			// continue loop → send tool result back to LLM
+			// continue loop -> send tool result back to LLM
 			continue
 		}
 
-		// 2️⃣ Final response
+		// Final response
 		if msg.Content != "" {
-			a.messages = append(a.messages, assistantMsg(msg.Content))
+			a.messages = append(a.messages, assistantMsgFromResponse(msg))
 			a.messages = trimMessages(a.messages)
 			return msg.Content, nil
 		}

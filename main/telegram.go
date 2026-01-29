@@ -4,19 +4,23 @@ import (
 	"context"
 	"log"
 
+	"github.com/Shreehari-Acharya/vayuu/main/agent"
+	"github.com/Shreehari-Acharya/vayuu/main/tools"
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
 
 type App struct {
-	agent *Agent
+	agent *agent.Agent
 }
 
 func startTelegramBotWithAgent(ctx *context.Context, cfg *config.Config) {
 	app := &App{
-		agent: NewAgent(systemPrompt, cfg),
+		agent: agent.NewAgent(systemPrompt, cfg),
 	}
+
+	app.agent.RegisterTool(tools.ExecuteCommandTool())
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(app.handler),
@@ -34,7 +38,7 @@ func (a* App) handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return
 	}
-	agentResponse, err  := a.agent.runAgent(ctx, update.Message.Text)
+	agentResponse, err  := a.agent.RunAgent(ctx, update.Message.Text)
 
 	if err != nil {
 		log.Printf("Error running agent: %v", err)
@@ -49,7 +53,7 @@ func (a* App) handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 func sendMessage(chatID int64, text string, b *bot.Bot, ctx context.Context) error {
 
-	text = bot.EscapeMarkdown(text)
+	text = bot.EscapeMarkdownUnescaped(text)
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ParseMode: models.ParseModeMarkdown,
