@@ -27,5 +27,5 @@ func main() {
 		panic(err)
 	}
 
-	startTelegramBot(&ctx, cfg)
+	startTelegramBotWithAgent(&ctx, cfg)
 }
