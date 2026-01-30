@@ -4,34 +4,55 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+    "strings"
 )
 
 // The Tool Handler function to read file contents
 func ReadFile(args map[string]any) string {
-    path, ok := args["path"].(string)
-    if !ok {
-        return "Error: path must be a string"
-    }
+	// Single file
+	if pathStr, ok := args["path"].(string); ok {
+		return readSingleFile(pathStr)
+	}
 
-    path = expandPath(path)
-    // Clean the path to prevent directory traversal
-    cleanPath := filepath.Clean(path)
+	// Multiple files
+	if pathSlice, ok := args["path"].([]any); ok {
+		var results []string
+		for i, p := range pathSlice {
+			pathStr, ok := p.(string)
+			if !ok {
+				return fmt.Sprintf("Error: path[%d] must be a string", i)
+			}
+			result := readSingleFile(pathStr)
+			results = append(results, fmt.Sprintf("=== %s ===\n%s", pathStr, result))
+		}
+		return strings.Join(results, "\n\n")
+	}
 
-    // Check file stats before reading
-    info, err := os.Stat(cleanPath)
-    if err != nil {
-        return fmt.Sprintf("Error: file not found: %s", err.Error())
-    }
+	return "Error: path must be a string or array of strings"
+}
 
-    // 3. Limit size (e.g., max 5MB) to prevent memory crashes
-    if info.Size() > 5*1024*1024 {
-        return "Error: file is too large (max 5MB)"
-    }
+func readSingleFile(relativePath string) string {
+	fullPath := filepath.Join(agentWorkDir, relativePath)
 
-    data, err := os.ReadFile(cleanPath)
-    if err != nil {
-        return fmt.Sprintf("Error reading file: %v", err)
-    }
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		return fmt.Sprintf("Error accessing file: %v", err)
+	}
 
-    return string(data)
+	if info.IsDir() {
+		return "Error: path is a directory, not a file"
+	}
+
+	const maxFileSize = 5 * 1024 * 1024
+	if info.Size() > maxFileSize {
+		return fmt.Sprintf("Error: file too large (%.2f MB, max 5 MB)", 
+			float64(info.Size())/(1024*1024))
+	}
+
+	data, err := os.ReadFile(fullPath)
+	if err != nil {
+		return fmt.Sprintf("Error reading file: %v", err)
+	}
+
+	return string(data)
 }

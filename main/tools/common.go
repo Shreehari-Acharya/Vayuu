@@ -2,21 +2,14 @@ package tools
 // common functions used by many tools
 
 import (
-	"os"
-	"path/filepath"
-	"strings"
+    "github.com/Shreehari-Acharya/vayuu/config"
 )
 
-func expandPath(path string) string {
-    if !strings.HasPrefix(path, "~") {
-        return filepath.Clean(path)
+var agentWorkDir string
+
+func init() {
+    cfg, err := config.Load()
+    if err == nil && cfg != nil {
+        agentWorkDir = cfg.AgentWorkDir
     }
-    
-    home, err := os.UserHomeDir()
-    if err != nil {
-        return filepath.Clean(path) // Fallback to literal if home is missing
-    }
-    
-    // Join home with everything after the ~
-    return filepath.Join(home, path[1:])
 }
