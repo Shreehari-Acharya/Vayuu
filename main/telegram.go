@@ -57,10 +57,10 @@ func (a* App) handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 func sendMessage(chatID int64, text string, b *bot.Bot, ctx context.Context) error {
 
-	text = bot.EscapeMarkdownUnescaped(text)
+	// text = bot.EscapeMarkdownUnescaped(text)
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ParseMode: models.ParseModeMarkdown,
+		ParseMode: models.ParseModeMarkdownV1,
 		ChatID: chatID,
 		Text:   text,
 	})
