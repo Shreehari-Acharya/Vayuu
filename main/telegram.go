@@ -18,7 +18,7 @@ type App struct {
 
 func startTelegramBotWithAgent(ctx *context.Context, cfg *config.Config) {
 	app := &App{
-		agent: agent.NewAgent(prompts.GetSystemPrompt(), cfg),
+		agent: agent.NewAgent(prompts.SystemPrompt, cfg),
 	}
 
 	// Register all tools using a loop
