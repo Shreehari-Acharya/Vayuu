@@ -16,6 +16,7 @@ type Config struct {
 	Provider      string
 	MemorySize    int
 	Model         string
+	AgentWorkDir  string
 }
 
 var (
@@ -37,6 +38,7 @@ func Load() (*Config, error) {
 			Provider:      os.Getenv("PROVIDER"),
 			Model:         os.Getenv("MODEL"),
 			MemorySize:    getEnvAsInt("MEMORY_SIZE", 20),
+			AgentWorkDir: os.Getenv("AGENT_WORKDIR"),
 		}
 
 		err = instance.validate()
