@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 )
 
-// The Tool Handler function to write contents to a file
+// WriteFile handles writing content to a file
+// Creates the file or overwrites it if it exists
 func WriteFile(args map[string]any) string {
 	path, okPath := args["path"].(string)
 	content, okContent := args["content"].(string)
@@ -15,20 +16,21 @@ func WriteFile(args map[string]any) string {
 		return "Error: 'path' and 'content' must be strings"
 	}
 
-	path = filepath.Join(agentWorkDir, path)
+	fullPath, err := ValidatePath(path)
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
 
-	// Ensure the directory exists (0755 = standard directory permissions)
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Ensure the directory exists
+	dir := filepath.Dir(fullPath)
+	if err := EnsureDirectoryExists(dir); err != nil {
 		return fmt.Sprintf("Error creating directory: %v", err)
 	}
 
-	// 3. Write the file (0644 = readable by all, writable by owner)
-	// This will create the file or overwrite it if it exists.
-	err := os.WriteFile(path, []byte(content), 0644)
-	if err != nil {
+	// Write the file (0644 = readable by all, writable by owner)
+	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
 		return fmt.Sprintf("Error writing file: %v", err)
 	}
 
-	return fmt.Sprintf("Successfully wrote %d bytes to %s", len(content), path)
+	return fmt.Sprintf("Successfully wrote %s to %s", FormatBytes(int64(len(content))), path)
 }

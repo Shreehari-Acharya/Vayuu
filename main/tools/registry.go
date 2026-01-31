@@ -2,11 +2,88 @@ package tools
 
 import "github.com/Shreehari-Acharya/vayuu/main/agent"
 
-func ExecuteCommandTool() agent.Tool {
-	return agent.Tool{
-		Name:        "execute_command",
-		Description: "Execute bash command(s) on the local system",
-		Parameters: map[string]any{
+// toolMetadata defines the structure for tool definitions
+type toolMetadata struct {
+	name        string
+	description string
+	parameters  map[string]any
+	handler     func(map[string]any) string
+}
+
+// toolDefinitions holds all tool configurations
+var toolDefinitions = []toolMetadata{
+	{
+		name:        "read_file",
+		description: "Read the contents of a file(s) at the given path",
+		parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "string",
+					},
+				},
+			},
+			"required": []string{"path"},
+		},
+		handler: ReadFile,
+	},
+	{
+		name:        "write_file",
+		description: "Write content to a file at the given path",
+		parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type": "string",
+				},
+				"content": map[string]any{
+					"type": "string",
+				},
+			},
+			"required": []string{"path", "content"},
+		},
+		handler: WriteFile,
+	},
+	{
+		name:        "append_to_file",
+		description: "Append content to a file at the given path (will create the file if it does not exist)",
+		parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type": "string",
+				},
+				"content": map[string]any{
+					"type": "string",
+				},
+			},
+			"required": []string{"path", "content"},
+		},
+		handler: AppendToFile,
+	},
+	{
+		name:        "delete_file",
+		description: "Delete file(s) at the given path",
+		parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "string",
+					},
+				},
+			},
+			"required": []string{"path"},
+		},
+		handler: DeleteFile,
+	},
+	{
+		name:        "execute_command",
+		description: "Execute bash command(s) on the local system",
+		parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"command": map[string]any{
@@ -18,98 +95,44 @@ func ExecuteCommandTool() agent.Tool {
 			},
 			"required": []string{"command"},
 		},
-		Handler: ExecuteCommand,
-	}
-}
-
-func ReadFileTool() agent.Tool {
-	return agent.Tool{
-		Name:        "read_file",
-		Description: "Read the contents of a file(s) at the given path",
-		Parameters: map[string]any{
+		handler: ExecuteCommand,
+	},
+	{
+		name:        "send_file",
+		description: "Send a file to the user in Telegram chat",
+		parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"path": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type": "string",
-					},
+					"type":        "string",
+					"description": "Path to the file to send",
+				},
+				"caption": map[string]any{
+					"type":        "string",
+					"description": "Optional caption for the file",
 				},
 			},
 			"required": []string{"path"},
 		},
-		Handler: ReadFile,
-	}
+		handler: SendFile,
+	},
 }
 
-func WriteFileTool() agent.Tool {
+// toAgentTool converts toolMetadata to agent.Tool
+func (tm toolMetadata) toAgentTool() agent.Tool {
 	return agent.Tool{
-		Name:        "write_file",
-		Description: "Write content to a file at the given path",
-		Parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "string",
-				},
-				"content": map[string]any{
-					"type": "string",
-				},
-			},
-			"required": []string{"path", "content"},
-		},
-		Handler: WriteFile,
+		Name:        tm.name,
+		Description: tm.description,
+		Parameters:  tm.parameters,
+		Handler:     tm.handler,
 	}
 }
 
-func AppendToFileTool() agent.Tool {
-	return agent.Tool{
-		Name:        "append_to_file",
-		Description: "Append content to a file at the given path (will create the file if it does not exist)",
-		Parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "string",
-				},
-				"content": map[string]any{
-					"type": "string",
-				},
-			},
-			"required": []string{"path", "content"},
-		},
-		Handler: AppendToFile,
+// GetAllTools returns all available tools as agent.Tool instances
+func GetAllTools() []agent.Tool {
+	tools := make([]agent.Tool, len(toolDefinitions))
+	for i, def := range toolDefinitions {
+		tools[i] = def.toAgentTool()
 	}
+	return tools
 }
-
-func DeleteFileTool() agent.Tool {
-	return agent.Tool{
-		Name:        "delete_file",
-		Description: "Delete  file(s) at the given path",
-		Parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type": "string",
-					},
-				},
-			},
-			"required": []string{"path"},
-		},
-		Handler: DeleteFile,
-	}
-}
-
-
-func GetAllTools() []agent.Tool { 
-    return []agent.Tool{
-        ExecuteCommandTool(),
-        ReadFileTool(),
-        WriteFileTool(),
-		AppendToFileTool(),
-		DeleteFileTool(),
-    }
-}
-

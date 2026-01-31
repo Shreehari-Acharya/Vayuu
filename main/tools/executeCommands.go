@@ -1,20 +1,14 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
-	"context"
-	"time"
 	"strings"
-	"os"
 )
 
-// The Tool Handler function to execute shell commands
-const (
-	maxCommandTimeout = 30 * time.Second
-	maxOutputSize     = 10 * 1024 * 1024 // 10MB
-	maxCommands       = 20                
-)
+// ExecuteCommand handles executing shell commands
+// Supports both single command (string) and multiple commands (array)
 
 func ExecuteCommand(args map[string]any) string {
 	// Handle single command (string)
@@ -35,8 +29,8 @@ func executeMultipleCommands(cmdArray []any) string {
 		return "Error: command array cannot be empty"
 	}
 
-	if len(cmdArray) > maxCommands {
-		return fmt.Sprintf("Error: too many commands (max %d)", maxCommands)
+	if len(cmdArray) > MaxCommands {
+		return fmt.Sprintf("Error: too many commands (max %d)", MaxCommands)
 	}
 
 	var results []string
@@ -51,7 +45,7 @@ func executeMultipleCommands(cmdArray []any) string {
 		}
 
 		result := executeSingleCommand(cmdStr)
-		
+
 		// Check if command failed - optionally stop on first error
 		if strings.HasPrefix(result, "Error:") {
 			results = append(results, fmt.Sprintf("Command %d failed: %s\n%s", i+1, cmdStr, result))
@@ -72,25 +66,25 @@ func executeSingleCommand(cmd string) string {
 
 	fmt.Printf("Executing command in %s: %s\n", agentWorkDir, cmd)
 
-	ctx, cancel := context.WithTimeout(context.Background(), maxCommandTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), MaxCommandTimeout)
 	defer cancel()
 
 	command := exec.CommandContext(ctx, "bash", "-c", cmd)
 	command.Dir = agentWorkDir
 
-	if err := validateWorkDir(); err != nil {
+	if err := ValidateWorkDir(); err != nil {
 		return fmt.Sprintf("Error: invalid work directory: %v", err)
 	}
 
 	output, err := command.CombinedOutput()
 
 	if ctx.Err() == context.DeadlineExceeded {
-		return fmt.Sprintf("Error: command timed out after %v", maxCommandTimeout)
+		return fmt.Sprintf("Error: command timed out after %v", MaxCommandTimeout)
 	}
 
-	if len(output) > maxOutputSize {
-		return fmt.Sprintf("Error: command output too large (%.2f MB, max 10 MB)\nFirst 1000 chars:\n%s",
-			float64(len(output))/(1024*1024),
+	if len(output) > MaxCommandOutput {
+		return fmt.Sprintf("Error: command output too large (%s, max %s)\nFirst 1000 chars:\n%s",
+			FormatBytes(int64(len(output))), FormatBytes(MaxCommandOutput),
 			string(output[:1000]))
 	}
 
@@ -99,17 +93,4 @@ func executeSingleCommand(cmd string) string {
 	}
 
 	return string(output)
-}
-
-func validateWorkDir() error {
-	info, err := os.Stat(agentWorkDir)
-	if err != nil {
-		return fmt.Errorf("cannot access: %w", err)
-	}
-
-	if !info.IsDir() {
-		return fmt.Errorf("not a directory")
-	}
-
-	return nil
 }

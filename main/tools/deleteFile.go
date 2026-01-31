@@ -3,9 +3,11 @@ package tools
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 )
+
+// DeleteFile handles deleting files
+// Supports both single file (string) and multiple files (array)
 func DeleteFile(args map[string]any) string {
 	// Handle single file (string)
 	if pathStr, ok := args["path"].(string); ok {
@@ -25,9 +27,8 @@ func deleteMultipleFiles(pathArray []any) string {
 		return "Error: path array cannot be empty"
 	}
 
-	const maxFiles = 50
-	if len(pathArray) > maxFiles {
-		return fmt.Sprintf("Error: too many files (max %d)", maxFiles)
+	if len(pathArray) > MaxFilesPerOperation {
+		return fmt.Sprintf("Error: too many files (max %d)", MaxFilesPerOperation)
 	}
 
 	var results []string
@@ -60,22 +61,13 @@ func deleteMultipleFiles(pathArray []any) string {
 }
 
 func deleteSingleFile(relativePath string) string {
-	if strings.TrimSpace(relativePath) == "" {
-		return "Error: path cannot be empty"
-	}
-
-	// Build full path
-	fullPath := filepath.Join(agentWorkDir, relativePath)
-
-	// Security: Prevent path traversal
-	cleanPath := filepath.Clean(fullPath)
-	cleanWorkDir := filepath.Clean(agentWorkDir)
-	if !strings.HasPrefix(cleanPath, cleanWorkDir) {
-		return "Error: path traversal not allowed"
+	fullPath, err := ValidatePath(relativePath)
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
 	}
 
 	// Check if file exists
-	info, err := os.Stat(fullPath)
+	_, err = os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Sprintf("Error: file does not exist: %s", relativePath)
@@ -84,12 +76,12 @@ func deleteSingleFile(relativePath string) string {
 	}
 
 	// Prevent deleting directories (use a separate tool for that)
-	if info.IsDir() {
+	if IsFileDirectory(fullPath) {
 		return fmt.Sprintf("Error: path is a directory, not a file: %s", relativePath)
 	}
 
 	// Optional: Prevent deleting important files
-	if isProtectedFile(relativePath) {
+	if IsProtectedFile(relativePath) {
 		return fmt.Sprintf("Error: cannot delete protected file: %s", relativePath)
 	}
 
@@ -98,23 +90,5 @@ func deleteSingleFile(relativePath string) string {
 		return fmt.Sprintf("Error deleting file: %v", err)
 	}
 
-	fmt.Printf("Deleted file: %s\n", fullPath)
 	return fmt.Sprintf("Successfully deleted: %s", relativePath)
-}
-
-// Optional: Protect certain files from deletion
-func isProtectedFile(path string) bool {
-	protectedPatterns := []string{
-		".env",
-		"config.json",
-		".git/",
-		// Add more patterns as needed
-	}
-
-	for _, pattern := range protectedPatterns {
-		if strings.Contains(path, pattern) {
-			return true
-		}
-	}
-	return false
 }

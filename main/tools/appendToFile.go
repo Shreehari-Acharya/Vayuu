@@ -3,15 +3,11 @@ package tools
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
-const (
-	maxAppendSize = 5 * 1024 * 1024 // 5MB max append size
-	maxFileSize   = 50 * 1024 * 1024 // 50MB max total file size after append
-)
-
+// AppendToFile handles appending content to a file
+// Creates the file if it does not exist
 func AppendToFile(args map[string]any) string {
 	pathStr, ok := args["path"].(string)
 	if !ok {
@@ -32,40 +28,31 @@ func AppendToFile(args map[string]any) string {
 }
 
 func appendToFile(relativePath, content string) string {
-	if strings.TrimSpace(relativePath) == "" {
-		return "Error: path cannot be empty"
-	}
-
-	// Build full path
-	fullPath := filepath.Join(agentWorkDir, relativePath)
-
-	// Security: Prevent path traversal
-	cleanPath := filepath.Clean(fullPath)
-	cleanWorkDir := filepath.Clean(agentWorkDir)
-	if !strings.HasPrefix(cleanPath, cleanWorkDir) {
-		return "Error: path traversal not allowed"
+	fullPath, err := ValidatePath(relativePath)
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
 	}
 
 	// Check content size
-	if len(content) > maxAppendSize {
-		return fmt.Sprintf("Error: content too large (%.2f MB, max 5 MB)",
-			float64(len(content))/(1024*1024))
+	if len(content) > MaxAppendSize {
+		return fmt.Sprintf("Error: content too large (%s, max %s)",
+			FormatBytes(int64(len(content))), FormatBytes(MaxAppendSize))
 	}
 
 	// Check if file exists and get its size
 	var currentSize int64
 	if info, err := os.Stat(fullPath); err == nil {
 		// File exists
-		if info.IsDir() {
+		if IsFileDirectory(fullPath) {
 			return fmt.Sprintf("Error: path is a directory, not a file: %s", relativePath)
 		}
 		currentSize = info.Size()
 
 		// Check total size after append
 		newSize := currentSize + int64(len(content))
-		if newSize > maxFileSize {
-			return fmt.Sprintf("Error: file would be too large after append (%.2f MB, max 50 MB)",
-				float64(newSize)/(1024*1024))
+		if newSize > MaxTotalFileSize {
+			return fmt.Sprintf("Error: file would be too large after append (%s, max %s)",
+				FormatBytes(newSize), FormatBytes(MaxTotalFileSize))
 		}
 	} else if !os.IsNotExist(err) {
 		// Error other than file not existing
@@ -87,12 +74,13 @@ func appendToFile(relativePath, content string) string {
 	}
 
 	fmt.Printf("Appended %d bytes to: %s\n", bytesWritten, fullPath)
-	
+
 	action := "appended to"
 	if currentSize == 0 {
 		action = "created and wrote to"
 	}
-	
-	return fmt.Sprintf("Successfully %s file: %s (%d bytes written, total size: %.2f KB)",
-		action, relativePath, bytesWritten, float64(currentSize+int64(bytesWritten))/1024)
+
+	totalSize := currentSize + int64(bytesWritten)
+	return fmt.Sprintf("Successfully %s file: %s (%d bytes written, total size: %s)",
+		action, relativePath, bytesWritten, FormatBytes(totalSize))
 }

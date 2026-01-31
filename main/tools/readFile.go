@@ -3,11 +3,11 @@ package tools
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-    "strings"
+	"strings"
 )
 
-// The Tool Handler function to read file contents
+// ReadFile handles reading file contents
+// Supports both single file (string) and multiple files (array)
 func ReadFile(args map[string]any) string {
 	// Single file
 	if pathStr, ok := args["path"].(string); ok {
@@ -32,21 +32,23 @@ func ReadFile(args map[string]any) string {
 }
 
 func readSingleFile(relativePath string) string {
-	fullPath := filepath.Join(agentWorkDir, relativePath)
+	fullPath, err := ValidatePath(relativePath)
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
 
-	info, err := os.Stat(fullPath)
+	if IsFileDirectory(fullPath) {
+		return "Error: path is a directory, not a file"
+	}
+
+	fileSize, err := GetFileSize(fullPath)
 	if err != nil {
 		return fmt.Sprintf("Error accessing file: %v", err)
 	}
 
-	if info.IsDir() {
-		return "Error: path is a directory, not a file"
-	}
-
-	const maxFileSize = 5 * 1024 * 1024
-	if info.Size() > maxFileSize {
-		return fmt.Sprintf("Error: file too large (%.2f MB, max 5 MB)", 
-			float64(info.Size())/(1024*1024))
+	if fileSize > MaxReadFileSize {
+		return fmt.Sprintf("Error: file too large (%s, max %s)",
+			FormatBytes(fileSize), FormatBytes(MaxReadFileSize))
 	}
 
 	data, err := os.ReadFile(fullPath)
