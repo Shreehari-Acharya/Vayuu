@@ -52,6 +52,7 @@ func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) 
 
 	errCount := 0
 	iterations := 0
+	var toolCallsInfo string
 
 	for {
 		// Safety checks
@@ -78,7 +79,8 @@ func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) 
 		if len(msg.ToolCalls) > 0 {
 			messages = append(messages, assistantMsgFromResponse(msg))
 			
-			if err := a.handleToolCalls(msg, &messages); err != nil {
+			toolCallsInfo, err = a.handleToolCalls(msg, &messages)
+			if err != nil {
 				return "", err
 			}
 			continue
@@ -87,9 +89,11 @@ func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) 
 		// Final response
 		if msg.Content != "" {
 			return msg.Content, nil
+		} else if toolCallsInfo != "" {
+			return toolCallsInfo, nil
+		} else {
+			return "Done.", nil
 		}
-
-		return "", fmt.Errorf("agent stopped with no output")
 	}
 }
 
@@ -101,20 +105,17 @@ func (a *Agent) getLLMResponse(ctx context.Context, messages []openai.ChatComple
 	})
 }
 
-func (a *Agent) handleToolCalls(msg openai.ChatCompletionMessage, messages *[]openai.ChatCompletionMessageParamUnion) error {
-	if msg.Content != "" {
-		fmt.Printf("Agent reasoning: %s\n", msg.Content)
-	}
+func (a *Agent) handleToolCalls(msg openai.ChatCompletionMessage, messages *[]openai.ChatCompletionMessageParamUnion) (string, error) {
 
 	for _, tc := range msg.ToolCalls {
 		tool, ok := a.tools[tc.Function.Name]
 		if !ok {
-			return fmt.Errorf("unknown tool: %s", tc.Function.Name)
+			return "", fmt.Errorf("unknown tool: %s", tc.Function.Name)
 		}
 
 		var args map[string]any
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-			return fmt.Errorf("failed to parse arguments for %s: %w", tc.Function.Name, err)
+			return "", fmt.Errorf("failed to parse arguments for %s: %w", tc.Function.Name, err)
 		}
 
 		result := tool.Handler(args)
@@ -127,6 +128,12 @@ func (a *Agent) handleToolCalls(msg openai.ChatCompletionMessage, messages *[]op
 
 		*messages = append(*messages, toolCallMsg(tc.ID, result))
 	}
+
+	var toolCallsInfo string
+	if msg.Content != "" {
+		fmt.Printf("Agent reasoning: %s\n", msg.Content)
+		toolCallsInfo = msg.Content
+	}
 	
-	return nil
+	return toolCallsInfo, nil
 }
