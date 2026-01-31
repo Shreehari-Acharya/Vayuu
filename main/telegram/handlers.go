@@ -1,0 +1,58 @@
+package telegram
+
+import (
+	"context"
+	"log"
+
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
+)
+
+// handleMessage processes incoming messages
+func (tb *Bot) handleMessage(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	// Update current chat ID for tools to use
+	tb.setCurrentChatID(update.Message.Chat.ID)
+
+	// Send typing indicator
+	if err := tb.sendTypingAction(update.Message.Chat.ID); err != nil {
+		log.Printf("Error sending typing action: %v", err)
+	}
+
+	// Run agent
+	agentResponse, err := tb.agent.RunAgent(ctx, update.Message.Text)
+	if err != nil {
+		log.Printf("Error running agent: %v", err)
+		tb.sendMessage(update.Message.Chat.ID, "Sorry, I encountered an error processing your request.")
+		return
+	}
+
+	// Send response
+	if err := tb.sendMessage(update.Message.Chat.ID, agentResponse); err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
+}
+
+// handleCallback can be added for inline buttons
+func (tb *Bot) handleCallback(ctx context.Context, b *bot.Bot, update *models.Update) {
+	// Handle callback queries from inline keyboards
+	if update.CallbackQuery == nil {
+		return
+	}
+
+	// Implementation for callback handling
+	log.Printf("Received callback: %s", update.CallbackQuery.Data)
+}
+
+// handleDocument can be added for file uploads
+func (tb *Bot) handleDocument(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil || update.Message.Document == nil {
+		return
+	}
+
+	// Handle document uploads
+	log.Printf("Received document: %s", update.Message.Document.FileName)
+}
