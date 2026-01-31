@@ -99,7 +99,7 @@ var toolDefinitions = []toolMetadata{
 	},
 	{
 		name:        "send_file",
-		description: "Send a file to the user in Telegram chat",
+		description: "Send a file to the user",
 		parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -129,7 +129,7 @@ func (tm toolMetadata) toAgentTool() agent.Tool {
 }
 
 // GetAllTools returns all available tools as agent.Tool instances
-func GetAllTools() []agent.Tool {
+func getAllTools() []agent.Tool {
 	tools := make([]agent.Tool, len(toolDefinitions))
 	for i, def := range toolDefinitions {
 		tools[i] = def.toAgentTool()

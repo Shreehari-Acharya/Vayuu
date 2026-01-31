@@ -4,9 +4,17 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	
+
 	"github.com/Shreehari-Acharya/vayuu/config"
+	"github.com/Shreehari-Acharya/vayuu/main/agent"
+	"github.com/Shreehari-Acharya/vayuu/main/telegram"
+	"github.com/Shreehari-Acharya/vayuu/main/prompts"
+	"github.com/Shreehari-Acharya/vayuu/main/tools"
 )
+
+
+var agentInstance *agent.Agent
+
 
 func main() {
 
@@ -18,5 +26,12 @@ func main() {
 		panic(err)
 	}
 
-	startTelegramBotWithAgent(&ctx, cfg)
+	// create an agent
+	agentInstance = agent.NewAgent(prompts.SystemPrompt, cfg)
+
+	// assign tools to the agent
+	tools.Initialize(cfg, agentInstance)
+
+	// start telegram bot with the agent
+	telegram.NewBot(cfg, &ctx, agentInstance)
 }
