@@ -64,7 +64,7 @@ func executeSingleCommand(cmd string) string {
 		return "Error: command cannot be empty"
 	}
 
-	fmt.Printf("Executing command in %s: %s\n", agentWorkDir, cmd)
+	// fmt.Printf("Executing command in %s: %s\n", agentWorkDir, cmd)
 
 	ctx, cancel := context.WithTimeout(context.Background(), MaxCommandTimeout)
 	defer cancel()

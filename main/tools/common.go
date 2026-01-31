@@ -1,6 +1,8 @@
 package tools
 
 import (
+    "os"
+
 	"github.com/Shreehari-Acharya/vayuu/config"
     "github.com/Shreehari-Acharya/vayuu/main/agent"
 )
@@ -25,6 +27,16 @@ func Initialize(cfg *config.Config, agent *agent.Agent) {
         agent.RegisterTool(tool)
     }
 
+}
+
+func handleTildeInPath(path string) string {
+    if len(path) > 0 && path[0] == '~' {
+        homeDir, err := os.UserHomeDir()
+        if err == nil {
+            return homeDir + path[1:]
+        }
+    }
+    return "failed to get user home directory"
 }
 
 // GetAgentWorkDir returns the working directory for agent operations

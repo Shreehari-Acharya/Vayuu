@@ -12,6 +12,11 @@ func ValidatePath(relativePath string) (string, error) {
 	if strings.TrimSpace(relativePath) == "" {
 		return "", fmt.Errorf("path cannot be empty")
 	}
+	
+	if(relativePath[0] == '~') {
+		relativePath = handleTildeInPath(relativePath)
+		return relativePath, nil
+	}
 
 	fullPath := filepath.Join(agentWorkDir, relativePath)
 

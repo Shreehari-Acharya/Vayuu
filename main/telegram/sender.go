@@ -11,19 +11,21 @@ import (
 )
 
 // sendMessage sends a text message to a chat
-func (tb *Bot) sendMessage(chatID int64, text string) error {
-	_, err := tb.bot.SendMessage(*tb.ctx, &bot.SendMessageParams{
+func (tb *Bot) SendMessage(text string) error {
+	ctx := *tb.ctx
+	_, err := tb.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ParseMode: models.ParseModeMarkdownV1,
-		ChatID:    chatID,
+		ChatID:    tb.currentChatID,
 		Text:      text,
 	})
 	return err
 }
 
 // sendTypingAction shows the typing indicator
-func (tb *Bot) sendTypingAction(chatID int64) error {
-	_, err := tb.bot.SendChatAction(*tb.ctx, &bot.SendChatActionParams{
-		ChatID: chatID,
+func (tb *Bot) sendTypingAction() error {
+	ctx := *tb.ctx
+	_, err := tb.bot.SendChatAction(ctx, &bot.SendChatActionParams{
+		ChatID: tb.currentChatID,
 		Action: models.ChatActionTyping,
 	})
 	return err
@@ -35,11 +37,11 @@ func (tb *Bot) SendFileToCurrentChat(filePath, caption string) error {
 	if tb.currentChatID == 0 {
 		return fmt.Errorf("no active chat")
 	}
-	return tb.sendFile(tb.currentChatID, filePath, caption)
+	return tb.sendFile(filePath, caption)
 }
 
 // sendFile sends a file to a specific chat
-func (tb *Bot) sendFile(chatID int64, filePath string, caption string) error {
+func (tb *Bot) sendFile(filePath string, caption string) error {
 	// Validate file
 	if err := tb.validateFile(filePath); err != nil {
 		return err
@@ -55,7 +57,7 @@ func (tb *Bot) sendFile(chatID int64, filePath string, caption string) error {
 	filename := filepath.Base(filePath)
 
 	params := &bot.SendDocumentParams{
-		ChatID: chatID,
+		ChatID: tb.currentChatID,
 		Document: &models.InputFileUpload{
 			Filename: filename,
 			Data:     fileData,
@@ -66,12 +68,14 @@ func (tb *Bot) sendFile(chatID int64, filePath string, caption string) error {
 		params.Caption = caption
 	}
 
-	_, err = tb.bot.SendDocument(*tb.ctx, params)
+	// Use background context to avoid deadlock with parent context
+	ctx := *tb.ctx
+	_, err = tb.bot.SendDocument(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to send document: %w", err)
 	}
 
-	log.Printf("Sent file to chat %d: %s", chatID, filePath)
+	log.Printf("Sent file to chat %d: %s", tb.currentChatID, filePath)
 	return nil
 }
 
