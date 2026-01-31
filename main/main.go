@@ -14,6 +14,7 @@ import (
 
 
 var agentInstance *agent.Agent
+var bot *telegram.Bot
 
 
 func main() {
@@ -33,5 +34,11 @@ func main() {
 	tools.Initialize(cfg, agentInstance)
 
 	// start telegram bot with the agent
-	telegram.NewBot(cfg, &ctx, agentInstance)
+	bot, err = telegram.NewBot(cfg, &ctx, agentInstance)
+	if err != nil {
+		panic(err)
+	}
+
+	bot.Start(ctx)
+	
 }

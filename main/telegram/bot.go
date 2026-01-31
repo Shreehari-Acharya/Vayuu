@@ -19,18 +19,22 @@ type Bot struct {
 
 // NewBot creates and initializes a new Telegram bot
 func NewBot(cfg *config.Config, ctx *context.Context, agent *agent.Agent) (*Bot, error) {
-	opts := []bot.Option{}
+
+	tb := &Bot{
+		agent: agent,
+		ctx:   ctx,
+	}
+
+	opts := []bot.Option{
+		bot.WithDefaultHandler(tb.handleMessage),
+	}
 
 	b, err := bot.New(cfg.TelegramToken, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create telegram bot: %w", err)
 	}
 
-	tb := &Bot{
-		bot:   b,
-		agent: agent,
-		ctx:   ctx,
-	}
+	tb.bot = b
 
 	// Inject file sender into tools
 	tools.SetFileSender(tb.SendFileToCurrentChat)
@@ -41,7 +45,6 @@ func NewBot(cfg *config.Config, ctx *context.Context, agent *agent.Agent) (*Bot,
 // Start begins listening for messages
 func (tb *Bot) Start(ctx context.Context) {
 	tb.ctx = &ctx
-	tb.bot.RegisterHandler(bot.HandlerTypeMessageText, "", bot.MatchTypeExact, tb.handleMessage)
 	tb.bot.Start(ctx)
 }
 
