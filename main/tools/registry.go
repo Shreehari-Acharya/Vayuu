@@ -47,23 +47,6 @@ var toolDefinitions = []toolMetadata{
 		handler: WriteFile,
 	},
 	{
-		name:        "append_to_file",
-		description: "Append content to a file at the given path (will create the file if it does not exist)",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "string",
-				},
-				"content": map[string]any{
-					"type": "string",
-				},
-			},
-			"required": []string{"path", "content"},
-		},
-		handler: AppendToFile,
-	},
-	{
 		name:        "delete_file",
 		description: "Delete file(s) at the given path",
 		parameters: map[string]any{
