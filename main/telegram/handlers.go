@@ -19,20 +19,20 @@ func (tb *Bot) handleMessage(ctx context.Context, b *bot.Bot, update *models.Upd
 
 	// Send typing indicator
 	if err := tb.sendTypingAction(); err != nil {
-		log.Printf("Error sending typing action: %v", err)
+		log.Printf("Typing indicator failed: %v", err)
 	}
 
 	// Run agent
 	agentResponse, err := tb.agent.RunAgent(ctx, update.Message.Text)
 	if err != nil {
-		log.Printf("Error running agent: %v", err)
+		log.Printf("Agent error: %v", err)
 		tb.SendMessage("Sorry, I encountered an error processing your request.")
 		return
 	}
 
 	// Send response
 	if err := tb.SendMessage(agentResponse); err != nil {
-		log.Printf("Error sending message: %v", err)
+		log.Printf("Send error: %v", err)
 	}
 }
 
