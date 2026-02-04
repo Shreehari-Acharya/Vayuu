@@ -1,7 +1,7 @@
 <div align="center">
 
 
-<img src="assets/vayuu.png" alt="Vayuu Logo" width="200"/>
+<img src="assets/vayuu.png" alt="Vayuu Logo" width="600"/>
 
 # Vayuu - Local AI Agent with Telegram Interface
 
