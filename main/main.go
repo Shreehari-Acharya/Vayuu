@@ -18,13 +18,23 @@ var agentInstance *agent.Agent
 var bot *telegram.Bot
 
 func main() {
+	// Check for setup command
+	if len(os.Args) > 1 && os.Args[1] == "setup" {
+		if err := config.RunSetup(); err != nil {
+			fmt.Fprintf(os.Stderr, "Setup failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	cfg, err := config.Load()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		fmt.Fprintln(os.Stderr, "\nRun 'vayuu setup' to configure the application.")
+		os.Exit(1)
 	}
 
 	// create an agent

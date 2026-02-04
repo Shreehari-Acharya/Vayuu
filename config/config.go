@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/term"
 )
 
 // Config holds all application configuration
@@ -23,10 +25,37 @@ var (
 )
 
 // Load loads and validates configuration
+// Tries encrypted config first, then falls back to environment variables
 func Load() (*Config, error) {
 	var err error
 	once.Do(func() {
-		// Load .env file (ignore error if not exists)
+		// Try to load from encrypted config if it exists
+		if hasEncryptedConfig() {
+			password := os.Getenv("VAYUU_PASSWORD")
+
+			// If not set via env, try to get from system keyring
+			if password == "" {
+				password = TryGetKeystorePassword()
+			}
+
+			// If still no password, prompt user
+			if password == "" {
+				fmt.Print("Enter config password: ")
+				var passBytes []byte
+				passBytes, err = term.ReadPassword(int(syscall.Stdin))
+				fmt.Println()
+				if err != nil {
+					err = fmt.Errorf("failed to read password: %w", err)
+					return
+				}
+				password = string(passBytes)
+			}
+
+			instance, err = LoadEncryptedConfig(password)
+			return
+		}
+
+		// Fall back to .env file or environment variables
 		_ = godotenv.Load()
 
 		instance = &Config{
@@ -87,4 +116,11 @@ func (c *Config) validate() error {
 	}
 
 	return nil
+}
+
+// hasEncryptedConfig checks if encrypted config file exists
+func hasEncryptedConfig() bool {
+	configPath := getConfigPath()
+	_, err := os.Stat(configPath)
+	return err == nil
 }
