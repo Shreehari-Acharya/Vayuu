@@ -37,6 +37,16 @@ func (tb *Bot) SendFileToCurrentChat(filePath, caption string) error {
 	if tb.currentChatID == 0 {
 		return fmt.Errorf("no active chat")
 	}
+
+	ctx := *tb.ctx
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	return tb.sendFile(filePath, caption)
 }
 

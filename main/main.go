@@ -2,20 +2,20 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/Shreehari-Acharya/vayuu/main/agent"
-	"github.com/Shreehari-Acharya/vayuu/main/telegram"
 	"github.com/Shreehari-Acharya/vayuu/main/prompts"
+	"github.com/Shreehari-Acharya/vayuu/main/telegram"
 	"github.com/Shreehari-Acharya/vayuu/main/tools"
 )
 
-
 var agentInstance *agent.Agent
 var bot *telegram.Bot
-
 
 func main() {
 
@@ -31,7 +31,9 @@ func main() {
 	agentInstance = agent.NewAgent(prompts.SystemPrompt, cfg)
 
 	// assign tools to the agent
-	tools.Initialize(cfg, agentInstance)
+	if err := tools.Initialize(cfg, agentInstance); err != nil {
+		panic(fmt.Errorf("failed to initialize tools: %w", err))
+	}
 
 	// start telegram bot with the agent
 	bot, err = telegram.NewBot(cfg, &ctx, agentInstance)
@@ -39,6 +41,15 @@ func main() {
 		panic(err)
 	}
 
-	bot.Start(ctx)
-	
+	// Start bot in goroutine
+	go bot.Start(ctx)
+
+	// Wait for shutdown signal
+	<-ctx.Done()
+
+	// Graceful shutdown
+	fmt.Println("\nShutting down gracefully...")
+	time.Sleep(1 * time.Second)
+	fmt.Println("Shutdown complete")
+
 }
