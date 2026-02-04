@@ -30,19 +30,6 @@ func ValidatePath(relativePath string) (string, error) {
 	return fullPath, nil
 }
 
-// ValidateWorkDir ensures the agent work directory exists and is valid
-func ValidateWorkDir() error {
-	info, err := os.Stat(agentWorkDir)
-	if err != nil {
-		return fmt.Errorf("cannot access: %w", err)
-	}
-
-	if !info.IsDir() {
-		return fmt.Errorf("not a directory")
-	}
-
-	return nil
-}
 
 // IsFileDirectory checks if a path points to a directory
 func IsFileDirectory(fullPath string) bool {

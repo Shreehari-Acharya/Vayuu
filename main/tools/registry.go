@@ -47,23 +47,6 @@ var toolDefinitions = []toolMetadata{
 		handler: WriteFile,
 	},
 	{
-		name:        "delete_file",
-		description: "Delete file(s) at the given path",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type": "string",
-					},
-				},
-			},
-			"required": []string{"path"},
-		},
-		handler: DeleteFile,
-	},
-	{
 		name:        "execute_command",
 		description: "Execute bash command(s) on the local system",
 		parameters: map[string]any{
@@ -98,6 +81,29 @@ var toolDefinitions = []toolMetadata{
 			"required": []string{"path"},
 		},
 		handler: SendFile,
+	},
+	{
+		name:        "edit_file",
+		description: "Edit a file by replacing a specific string with a new string. The old_string must match exactly (including whitespace and line breaks) and appear only once in the file.",
+		parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type":        "string",
+					"description": "Path to the file to edit",
+				},
+				"old_string": map[string]any{
+					"type":        "string",
+					"description": "The exact string to find and replace (must match exactly including whitespace)",
+				},
+				"new_string": map[string]any{
+					"type":        "string",
+					"description": "The new string to replace the old_string with",
+				},
+			},
+			"required": []string{"path", "old_string", "new_string"},
+		},
+		handler: EditFile,
 	},
 }
 
