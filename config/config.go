@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
 	"github.com/joho/godotenv"
 )
 
@@ -33,7 +34,7 @@ func Load() (*Config, error) {
 			ApiKey:        os.Getenv("API_KEY"),
 			ApiBaseURL:    os.Getenv("API_BASE_URL"),
 			Model:         os.Getenv("MODEL"),
-			AgentWorkDir: os.Getenv("AGENT_WORKDIR"),
+			AgentWorkDir:  os.Getenv("AGENT_WORKDIR"),
 		}
 
 		err = instance.validate()
@@ -71,6 +72,19 @@ func (c *Config) validate() error {
 		return fmt.Errorf("MODEL is required")
 	}
 
+	if c.AgentWorkDir == "" {
+		return fmt.Errorf("AGENT_WORKDIR is required")
+	}
+
+	// Validate work directory exists and is accessible
+	info, err := os.Stat(c.AgentWorkDir)
+	if err != nil {
+		return fmt.Errorf("AGENT_WORKDIR: %w", err)
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("AGENT_WORKDIR must be a directory: %s", c.AgentWorkDir)
+	}
+
 	return nil
 }
-
