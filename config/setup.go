@@ -109,6 +109,17 @@ func RunSetup() error {
 	fmt.Println("✓ Password stored in system keyring - no need to remember it!")
 	fmt.Println("✓ Configuration will be automatically unlocked when you run Vayuu")
 
+	// Initialize default templates in workspace (only if they don't exist)
+	fmt.Println("\nInitializing agent templates...")
+	if err := InitializeTemplates(agentWorkDir); err != nil {
+		fmt.Printf("Warning: failed to initialize templates: %v\n", err)
+		// Don't fail setup if templates can't be created
+	} else {
+		fmt.Println("✓ Templates ready (you can customize them in your workspace)")
+	}
+
+	fmt.Println("\n✓ Setup complete! You can now run: ./vayuu")
+
 	return nil
 }
 
