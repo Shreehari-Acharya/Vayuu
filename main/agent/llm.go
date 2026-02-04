@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/openai/openai-go/v3"
@@ -116,21 +116,21 @@ func cleanThinkingTags(content string) string {
 	// Step 1: Remove complete thinking blocks: <think>...</think>
 	re1 := regexp.MustCompile(`(?s)<think>.*?</think>`)
 	content = re1.ReplaceAllString(content, "")
-	
+
 	// Step 2: Handle orphaned closing tag </think> by removing everything before it
 	// This assumes the opening <think> was truncated/missing
 	re2 := regexp.MustCompile(`(?s)^.*?</think>\s*`)
 	content = re2.ReplaceAllString(content, "")
-	
+
 	// Step 3: Handle orphaned opening tag <think> by removing everything after it
 	// This assumes the closing </think> was truncated/missing
 	re3 := regexp.MustCompile(`(?s)<think>.*$`)
 	content = re3.ReplaceAllString(content, "")
-	
+
 	// Step 4: Clean up extra whitespace
 	re4 := regexp.MustCompile(`\n\s*\n\s*\n+`)
 	content = re4.ReplaceAllString(content, "\n\n")
-	
+
 	return strings.TrimSpace(content)
 }
 
@@ -141,6 +141,19 @@ func updateMemoryFile(messages []openai.ChatCompletionMessageParamUnion) error {
 	}
 
 	filepath := fmt.Sprintf("%s/%s.jsonl", memoryDir, time.Now().Format("2006-01-02"))
+
+	// Check file size before appending to prevent unbounded growth
+	if info, err := os.Stat(filepath); err == nil {
+		const maxSize = 10 * 1024 * 1024 // 10MB
+		if info.Size() > maxSize {
+			// Archive old file
+			archivePath := fmt.Sprintf("%s.%d", filepath, time.Now().Unix())
+			if err := os.Rename(filepath, archivePath); err != nil {
+				return fmt.Errorf("failed to archive memory: %w", err)
+			}
+		}
+	}
+
 	file, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -162,14 +175,14 @@ func updateMemoryFile(messages []openai.ChatCompletionMessageParamUnion) error {
 			}
 		} else if msg.OfAssistant != nil {
 			entry.Role = "assistant"
-			
+
 			if msg.OfAssistant.Content.OfString.String() != "" {
 				entry.Content = cleanThinkingTags(msg.OfAssistant.Content.OfString.Value)
 			} else {
 				continue // Skip if no content
 			}
 		} else {
-			continue 
+			continue
 		}
 
 		// Only write entries with content

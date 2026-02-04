@@ -27,16 +27,30 @@ func NewAgent(systemPrompt string, cfg *config.Config) *Agent {
 	}
 }
 
-func (a *Agent) RegisterTool(tool Tool) {
+func (a *Agent) RegisterTool(tool Tool) error {
 	if a.tools == nil {
 		a.tools = make(map[string]Tool)
 	}
+
+	if tool.Name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+
+	if tool.Handler == nil {
+		return fmt.Errorf("tool %s: handler cannot be nil", tool.Name)
+	}
+
+	if _, exists := a.tools[tool.Name]; exists {
+		return fmt.Errorf("tool %s: already registered", tool.Name)
+	}
+
 	a.tools[tool.Name] = tool
+	return nil
 }
 
 const (
-	maxLLMErrors        = 3
-	maxIterations       = 20
+	maxLLMErrors           = 3
+	maxIterations          = 20
 	temperatureLow float64 = 0.2
 )
 
@@ -95,7 +109,7 @@ func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) 
 	}
 
 	fmt.Printf("[%s] Assistant: %s\n\n", time.Now().Format("15:04:05"), finalResponse)
-	
+
 	return finalResponse, nil
 }
 
@@ -114,12 +128,16 @@ func (a *Agent) handleToolCalls(msg openai.ChatCompletionMessage, messages *[]op
 	for i, tc := range msg.ToolCalls {
 		tool, ok := a.tools[tc.Function.Name]
 		if !ok {
-			return fmt.Errorf("unknown tool: %s", tc.Function.Name)
+			availableTools := make([]string, 0, len(a.tools))
+			for name := range a.tools {
+				availableTools = append(availableTools, name)
+			}
+			return fmt.Errorf("unknown tool: %s (available: %v)", tc.Function.Name, availableTools)
 		}
 
 		var args map[string]any
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-			return fmt.Errorf("failed to parse arguments for %s: %w", tc.Function.Name, err)
+			return fmt.Errorf("tool %s: failed to parse arguments: %w\nArguments: %s", tc.Function.Name, err, tc.Function.Arguments)
 		}
 
 		startTime := time.Now()
