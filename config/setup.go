@@ -205,8 +205,8 @@ func promptSecret(prompt, defaultValue string) (string, error) {
 	value := strings.TrimSpace(string(secret))
 	if value == "" && defaultValue != "" {
 		return defaultValue, nil
-	} 
-	
+	}
+
 	return value, nil
 }
 

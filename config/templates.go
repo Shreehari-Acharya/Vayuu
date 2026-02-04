@@ -158,7 +158,7 @@ Document special skills and capabilities here.`,
 // Returns empty string if not found (agent will handle gracefully)
 func LoadTemplate(workDir, templateName string) string {
 	templatePath := filepath.Join(workDir, templateName)
-	
+
 	if content, err := os.ReadFile(templatePath); err == nil {
 		return string(content)
 	}
