@@ -35,6 +35,11 @@ func RunSetup() error {
 		return err
 	}
 
+	allowedUsername, err := promptInput(reader, "Allowed Telegram Username (without @)", "")
+	if err != nil {
+		return err
+	}
+
 	apiKey, err := promptSecret("API Key - openAI compatible services. Press enter if using ollama", "ollama")
 	if err != nil {
 		return err
@@ -68,8 +73,8 @@ func RunSetup() error {
 	}
 
 	// Prepare config data
-	configData := fmt.Sprintf("TELEGRAM_TOKEN=%s\nAPI_KEY=%s\nAPI_BASE_URL=%s\nMODEL=%s\nAGENT_WORKDIR=%s\n",
-		telegramToken, apiKey, apiBaseURL, model, agentWorkDir)
+	configData := fmt.Sprintf("TELEGRAM_TOKEN=%s\nAPI_KEY=%s\nAPI_BASE_URL=%s\nMODEL=%s\nAGENT_WORKDIR=%s\nALLOWED_USERNAME=%s\n",
+		telegramToken, apiKey, apiBaseURL, model, agentWorkDir, allowedUsername)
 
 	// Get or create encryption password using system keyring
 	fmt.Println("\nSecuring configuration...")
@@ -162,7 +167,10 @@ func LoadEncryptedConfig(password string) (*Config, error) {
 			cfg.Model = value
 		case "AGENT_WORKDIR":
 			cfg.AgentWorkDir = value
+		case "ALLOWED_USERNAME":
+			cfg.AllowedUsername = value
 		}
+		
 	}
 
 	if err := cfg.validate(); err != nil {

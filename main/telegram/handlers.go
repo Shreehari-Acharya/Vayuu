@@ -14,6 +14,12 @@ func (tb *Bot) handleMessage(ctx context.Context, b *bot.Bot, update *models.Upd
 		return
 	}
 
+	
+	if tb.cfg.AllowedUsername != "" && update.Message.From.Username != tb.cfg.AllowedUsername {
+		log.Printf("Unauthorized user: %s", update.Message.From.Username)
+		return
+	}
+
 	// Update current chat ID for tools to use
 	tb.setCurrentChatID(update.Message.Chat.ID)
 

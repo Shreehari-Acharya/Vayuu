@@ -17,6 +17,7 @@ type Config struct {
 	ApiBaseURL    string
 	Model         string
 	AgentWorkDir  string
+	AllowedUsername string
 }
 
 var (
@@ -64,6 +65,7 @@ func Load() (*Config, error) {
 			ApiBaseURL:    os.Getenv("API_BASE_URL"),
 			Model:         os.Getenv("MODEL"),
 			AgentWorkDir:  os.Getenv("AGENT_WORKDIR"),
+			AllowedUsername: os.Getenv("ALLOWED_USERNAME"),
 		}
 
 		err = instance.validate()
@@ -113,6 +115,10 @@ func (c *Config) validate() error {
 
 	if !info.IsDir() {
 		return fmt.Errorf("AGENT_WORKDIR must be a directory: %s", c.AgentWorkDir)
+	}
+
+	if c.AllowedUsername == "" {
+		return fmt.Errorf("ALLOWED_USERNAME is required")
 	}
 
 	return nil

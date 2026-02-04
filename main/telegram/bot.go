@@ -14,6 +14,7 @@ type Bot struct {
 	bot           *bot.Bot
 	agent         *agent.Agent
 	currentChatID int64
+	cfg 		 *config.Config
 	ctx           *context.Context
 }
 
@@ -36,6 +37,7 @@ func NewBot(cfg *config.Config, ctx *context.Context, agent *agent.Agent) (*Bot,
 
 	tb.bot = b
 
+	tb.cfg = cfg
 	// Inject file sender into tools
 	tools.SetFileSender(tb.SendFileToCurrentChat)
 
