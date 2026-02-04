@@ -1,6 +1,6 @@
 package tools
 
-import "github.com/Shreehari-Acharya/vayuu/main/agent"
+import "github.com/Shreehari-Acharya/vayuu/internal/agent"
 
 // toolMetadata defines the structure for tool definitions
 type toolMetadata struct {

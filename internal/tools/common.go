@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
-	"github.com/Shreehari-Acharya/vayuu/main/agent"
+	"github.com/Shreehari-Acharya/vayuu/internal/agent"
 )
 
 // agentWorkDir is the working directory for all agent operations

@@ -62,13 +62,13 @@ ollama pull kimi-k2.5:cloud
 ### Step 3: Install Vayuu
 
 ```bash
-# Install using go
-go install github.com/Shreehari-Acharya/vayuu/main@latest
+# Install using go (installs as 'vayuu' command)
+go install github.com/Shreehari-Acharya/vayuu/cmd/vayuu@latest
 
 # Or build from source
 git clone https://github.com/Shreehari-Acharya/vayuu.git
 cd vayuu
-go build -o vayuu ./main/
+go build -o vayuu ./cmd/vayuu/
 
 # Run interactive setup
 vayuu setup
@@ -348,7 +348,7 @@ sudo systemctl status vayuu
 FROM golang:1.21-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN go build -o vayuu ./main/
+RUN go build -o vayuu ./cmd/vayuu/
 
 FROM alpine:latest
 RUN apk add --no-cache ca-certificates chromium nodejs npm pandoc
@@ -466,7 +466,10 @@ vayuu/
 │   ├── setup.go         # Interactive setup wizard
 │   ├── keyring.go       # System keyring integration
 │   └── templates.go     # Template management
-├── main/
+├── cmd/
+│   └── vayuu/           # Application entry point
+│       └── main.go      # Main binary (produces "vayuu" executable)
+├── internal/            # Private packages (not importable externally)
 │   ├── agent/           # LLM agent logic
 │   │   ├── agent.go     # Main agent loop
 │   │   ├── llm.go       # LLM client wrapper
@@ -499,11 +502,11 @@ vayuu/
 
 ```bash
 # If installed via go install
-go install github.com/Shreehari-Acharya/vayuu/main@latest
+go install github.com/Shreehari-Acharya/vayuu/cmd/vayuu@latest
 
 # Or if built from source
 git pull
-go build -o vayuu ./main/
+go build -o vayuu ./cmd/vayuu/
 
 # Your config and customizations are preserved!
 vayuu

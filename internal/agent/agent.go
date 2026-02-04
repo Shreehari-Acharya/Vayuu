@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
-	"github.com/Shreehari-Acharya/vayuu/main/prompts"
+	"github.com/Shreehari-Acharya/vayuu/internal/prompts"
 	"github.com/openai/openai-go/v3"
 )
 

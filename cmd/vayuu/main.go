@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
-	"github.com/Shreehari-Acharya/vayuu/main/agent"
-	"github.com/Shreehari-Acharya/vayuu/main/prompts"
-	"github.com/Shreehari-Acharya/vayuu/main/telegram"
-	"github.com/Shreehari-Acharya/vayuu/main/tools"
+	"github.com/Shreehari-Acharya/vayuu/internal/agent"
+	"github.com/Shreehari-Acharya/vayuu/internal/prompts"
+	"github.com/Shreehari-Acharya/vayuu/internal/telegram"
+	"github.com/Shreehari-Acharya/vayuu/internal/tools"
 )
 
 var agentInstance *agent.Agent
@@ -53,13 +54,14 @@ func main() {
 
 	// Start bot in goroutine
 	go bot.Start(ctx)
+	log.Default().Println("Initialization complete. Bot is running. You can now interact with it on Telegram.")
 
 	// Wait for shutdown signal
 	<-ctx.Done()
 
 	// Graceful shutdown
-	fmt.Println("\nShutting down gracefully...")
+	log.Default().Println("Shutting down gracefully...")
 	time.Sleep(1 * time.Second)
-	fmt.Println("Shutdown complete")
+	log.Default().Println("Shutdown complete")
 
 }

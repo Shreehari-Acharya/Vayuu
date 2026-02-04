@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
-	"github.com/Shreehari-Acharya/vayuu/main/agent"
-	"github.com/Shreehari-Acharya/vayuu/main/tools"
+	"github.com/Shreehari-Acharya/vayuu/internal/agent"
+	"github.com/Shreehari-Acharya/vayuu/internal/tools"
 	"github.com/go-telegram/bot"
 )
 
