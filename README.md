@@ -70,8 +70,14 @@ ollama pull kimi-k2.5:cloud
 ### Step 3: Install Vayuu
 
 ```bash
-# Install using go (installs as 'vayuu' command)
+# Install latest version (recommended)
 go install github.com/Shreehari-Acharya/vayuu/cmd/vayuu@latest
+
+# Or install specific version
+go install github.com/Shreehari-Acharya/vayuu/cmd/vayuu@v0.1.0
+
+# If you get a "package not found" error, bypass the proxy cache:
+GOPROXY=direct go install github.com/Shreehari-Acharya/vayuu/cmd/vayuu@latest
 
 # Or build from source
 git clone https://github.com/Shreehari-Acharya/vayuu.git
