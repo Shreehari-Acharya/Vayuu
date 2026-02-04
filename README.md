@@ -1,16 +1,24 @@
-# Vayuu - Intelligent AI Agent for Telegram
+<div align="center">
 
-> **A powerful, privacy-focused AI agent that brings LLM capabilities directly to Telegram**
 
-Vayuu is an intelligent Telegram bot that can execute system commands, read/write files, browse the web, create documents, and interact with your local environment. Built to run best with **Ollama Cloud** for complete privacy and local control, but compatible with any OpenAI-compatible API provider.
+<img src="assets/vayuu.png" alt="Vayuu Logo" width="200"/>
+
+# Vayuu - Local AI Agent with Telegram Interface
+
+> **A powerful, privacy-focused AI agent that runs on your local machine and uses Telegram as its interface**
+
+</div>
+
+Vayuu is an intelligent AI agent that you deploy on your local machine. It uses Telegram as a convenient chat interface to interact with you, while executing system commands, reading/writing files, browsing the web, creating documents, and managing your local environment. Built to run best with **Ollama** for complete privacy and local control, but compatible with any OpenAI-compatible API provider.
 
 ## Key Features
 
-- **Local-First AI** - Designed for Ollama Cloud (free, private, no API costs)
+- **Local Deployment** - Runs on your machine, you control everything
+- **Telegram Interface** - Chat with your agent from anywhere via Telegram
+- **Local-First AI** - Designed for Ollama (free, private, no API costs)
 - **Secure by Default** - Encrypted config, system keyring integration
 - **System Integration** - Execute commands, manage files, create documents
 - **Extensible Skills** - Document generation, web scraping, and more
-- **Telegram Native** - Full conversation history and file sharing
 - **Customizable** - Edit agent personality and behavior without recompiling
 
 ## Installation & Setup
@@ -93,17 +101,18 @@ The interactive setup wizard will ask for:
 
 ### Step 5: Run Vayuu
 
-```bashCloud (sets to "ollama")
-3. **API Base URL** - Default: `http://localhost:11434/v1` (Ollama Cloud)
-4. **Model Name** - e.g., `kimi-k2.5:cloud` or `deepseek-r1:14b`
-5. **Workspace Directory** - Default: `~/.vayuu/workspace`
+```bash
+# Start the agent
+vayuu
+```
 
-**Configuration is automatically:**
-- Encrypted with AES-256-GCM
-- Password stored in system keyring (no password to remember!)
-- Templates copied to workspace for customization
+The bot will start and connect to Telegram. Send a message to your bot on Telegram to begin interacting!
 
-### Step 5: Run Vayuu
+### Alternative: Using OpenAI or Other Providers
+
+If you prefer to use OpenAI instead of Ollama:
+
+```bash
 vayuu setup
 ```
 
@@ -121,7 +130,7 @@ Vayuu comes with built-in tools that the agent can use:
 
 | Tool | Description | Usage |
 |------|-------------|-------|
-| *ad_file** | Read contents of files | Agent reads configuration, logs, source code |
+| **read_file** | Read contents of files | Agent reads configuration, logs, source code |
 | **write_file** | Write/create files | Agent creates documents, saves data |
 | **edit_file** | Edit files via string replacement | Agent modifies configuration, updates code |
 | **execute_command** | Execute bash commands | Agent installs packages, runs scripts |
@@ -217,6 +226,7 @@ Describe what this skill does
 ## Customization
 
 ### Agent Personality (SOUL.md)
+The agent also updates the contents when you ask it to "update its personality" or "change its behavior".
 
 Edit `~/.vayuu/workspace/SOUL.md` to customize your agent's:
 - Identity and name
@@ -228,6 +238,8 @@ Edit `~/.vayuu/workspace/SOUL.md` to customize your agent's:
 Changes take effect immediately - no recompilation needed!
 
 ### User Profile (USER.md)
+The agent also updates the contents when you ask/tell it more
+about yourself.
 
 Edit `~/.vayuu/workspace/USER.md` to tell the agent about you:
 - Your preferences
