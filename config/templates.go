@@ -2,8 +2,11 @@ package config
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/Shreehari-Acharya/vayuu/templates"
 )
 
 type TemplateFile struct {
@@ -17,13 +20,24 @@ func InitializeTemplates(workDir string) error {
 	// Get the source templates directory (relative to the binary location)
 	sourceDir := getSourceTemplatesDir()
 
-	if sourceDir == "" {
-		// If we can't find source templates, create basic ones
-		return createDefaultTemplates(workDir)
+	if sourceDir != "" {
+		// Copy templates from source
+		if err := copyTemplatesFromSource(sourceDir, workDir); err == nil {
+			return nil
+		} else {
+			fmt.Printf("Warning: failed to copy templates from source: %v\n", err)
+		}
 	}
 
-	// Copy templates from source
-	return copyTemplatesFromSource(sourceDir, workDir)
+	// Fall back to embedded templates
+	if err := copyTemplatesFromEmbedded(workDir); err == nil {
+		return nil
+	} else {
+		fmt.Printf("Warning: failed to copy embedded templates: %v\n", err)
+	}
+
+	// Last resort: create minimal defaults
+	return createDefaultTemplates(workDir)
 }
 
 // getSourceTemplatesDir finds the templates directory relative to the binary
@@ -49,8 +63,7 @@ func getSourceTemplatesDir() string {
 func copyTemplatesFromSource(sourceDir, workDir string) error {
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
-		// If source can't be read, fall back to defaults
-		return createDefaultTemplates(workDir)
+		return fmt.Errorf("failed to read source templates: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -67,6 +80,9 @@ func copyTemplatesFromSource(sourceDir, workDir string) error {
 			subEntries, _ := os.ReadDir(subDir)
 			for _, subEntry := range subEntries {
 				if !subEntry.IsDir() {
+					if filepath.Ext(subEntry.Name()) != ".md" {
+						continue
+					}
 					if err := copyFile(
 						filepath.Join(subDir, subEntry.Name()),
 						filepath.Join(targetDir, subEntry.Name()),
@@ -77,6 +93,9 @@ func copyTemplatesFromSource(sourceDir, workDir string) error {
 			}
 		} else {
 			// Copy root level files
+			if filepath.Ext(entry.Name()) != ".md" {
+				continue
+			}
 			if err := copyFile(
 				filepath.Join(sourceDir, entry.Name()),
 				filepath.Join(workDir, entry.Name()),
@@ -87,6 +106,44 @@ func copyTemplatesFromSource(sourceDir, workDir string) error {
 	}
 
 	return nil
+}
+
+// copyTemplatesFromEmbedded copies templates from embedded filesystem to workspace
+func copyTemplatesFromEmbedded(workDir string) error {
+	return fs.WalkDir(templates.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == "." {
+			return nil
+		}
+
+		targetPath := filepath.Join(workDir, path)
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, 0700)
+		}
+
+		// Don't overwrite existing files
+		if _, err := os.Stat(targetPath); err == nil {
+			return nil
+		}
+
+		content, err := fs.ReadFile(templates.EmbeddedFS, path)
+		if err != nil {
+			return fmt.Errorf("failed to read embedded template %s: %w", path, err)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0700); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(targetPath), err)
+		}
+
+		if err := os.WriteFile(targetPath, content, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", targetPath, err)
+		}
+
+		fmt.Printf("✓ Initialized: %s\n", filepath.Base(targetPath))
+		return nil
+	})
 }
 
 // copyFile copies a file only if it doesn't already exist
