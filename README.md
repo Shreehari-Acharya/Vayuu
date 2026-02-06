@@ -21,8 +21,10 @@ Vayuu is an intelligent AI agent that you deploy on your local machine. It uses 
 - **Extensible Skills** - Document generation, web scraping, and more
 - **Customizable** - Edit agent personality and behavior without recompiling
 
-<img src="assets/screenshot-1.jpeg" alt="Vayuu Screenshot" width="800"/>
-<img src="assets/screenshot-2.jpeg" alt="Vayuu Screenshot" width="800"/>
+<div align="center">
+  <img src="assets/screenshot-1.jpeg" alt="Vayuu Screenshot 1" width="400"/>
+  <img src="assets/screenshot-2.jpeg" alt="Vayuu Screenshot 2" width="400"/>
+</div>
 
 ## Installation & Setup
 
