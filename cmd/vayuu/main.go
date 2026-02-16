@@ -39,7 +39,10 @@ func main() {
 	}
 
 	// create an agent
-	agentInstance = agent.NewAgent(prompts.SystemPrompt, cfg)
+	agentInstance, err = agent.CreateAgent(prompts.SystemPrompt, cfg)
+	if err != nil {
+		panic(fmt.Errorf("failed to create agent: %w", err))
+	}
 
 	// assign tools to the agent
 	if err := tools.Initialize(cfg, agentInstance); err != nil {
