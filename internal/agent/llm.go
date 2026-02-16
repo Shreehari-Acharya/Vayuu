@@ -1,33 +1,22 @@
 package agent
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"regexp"
-	"strings"
-	"time"
-
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
-var cfig *config.Config
-
+// createLLMInstance creates a new OpenAI client using the provided configuration.
 func createLLMInstance(cfg *config.Config) *openai.Client {
-	apiKey := cfg.ApiKey
-	apiBaseURL := cfg.ApiBaseURL
-
 	client := openai.NewClient(
-		option.WithAPIKey(apiKey),
-		option.WithBaseURL(apiBaseURL),
+		option.WithAPIKey(cfg.ApiKey),
+		option.WithBaseURL(cfg.ApiBaseURL),
 	)
 
-	cfig = cfg
 	return &client
 }
 
+// systemMsg creates a system role message.
 func systemMsg(text string) openai.ChatCompletionMessageParamUnion {
 	return openai.ChatCompletionMessageParamUnion{
 		OfSystem: &openai.ChatCompletionSystemMessageParam{
@@ -39,6 +28,7 @@ func systemMsg(text string) openai.ChatCompletionMessageParamUnion {
 	}
 }
 
+// userMsg creates a user role message.
 func userMsg(text string) openai.ChatCompletionMessageParamUnion {
 	return openai.ChatCompletionMessageParamUnion{
 		OfUser: &openai.ChatCompletionUserMessageParam{
@@ -50,7 +40,8 @@ func userMsg(text string) openai.ChatCompletionMessageParamUnion {
 	}
 }
 
-func assistantMsgFromResponse(msg openai.ChatCompletionMessage) openai.ChatCompletionMessageParamUnion {
+// assistantMsg creates an assistant role message from an LLM response.
+func assistantMsg(msg openai.ChatCompletionMessage) openai.ChatCompletionMessageParamUnion {
 	assistant := &openai.ChatCompletionAssistantMessageParam{
 		Role: "assistant",
 	}
@@ -72,126 +63,15 @@ func assistantMsgFromResponse(msg openai.ChatCompletionMessage) openai.ChatCompl
 	}
 }
 
-func toolCallMsg(toolCallId string, content string) openai.ChatCompletionMessageParamUnion {
+// toolCallMsg creates a tool role message to send tool output back to the model.
+func toolCallMsg(toolCallID string, content string) openai.ChatCompletionMessageParamUnion {
 	return openai.ChatCompletionMessageParamUnion{
 		OfTool: &openai.ChatCompletionToolMessageParam{
 			Role:       "tool",
-			ToolCallID: toolCallId,
+			ToolCallID: toolCallID,
 			Content: openai.ChatCompletionToolMessageParamContentUnion{
 				OfString: openai.String(content),
 			},
 		},
 	}
-}
-
-func toolCallsToParams(
-	calls []openai.ChatCompletionMessageToolCallUnion,
-) []openai.ChatCompletionMessageToolCallUnionParam {
-
-	out := make([]openai.ChatCompletionMessageToolCallUnionParam, 0, len(calls))
-
-	for _, c := range calls {
-		out = append(out, openai.ChatCompletionMessageToolCallUnionParam{
-			OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
-				ID: c.ID,
-				Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
-					Name:      c.Function.Name,
-					Arguments: c.Function.Arguments,
-				},
-			},
-		})
-	}
-
-	return out
-}
-
-type MemoryEntry struct {
-	Timestamp string `json:"timestamp"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-}
-
-// cleanThinkingTags removes thinking tags and their content from LLM responses
-func cleanThinkingTags(content string) string {
-	// Step 1: Remove complete thinking blocks: <think>...</think>
-	re1 := regexp.MustCompile(`(?s)<think>.*?</think>`)
-	content = re1.ReplaceAllString(content, "")
-
-	// Step 2: Handle orphaned closing tag </think> by removing everything before it
-	// This assumes the opening <think> was truncated/missing
-	re2 := regexp.MustCompile(`(?s)^.*?</think>\s*`)
-	content = re2.ReplaceAllString(content, "")
-
-	// Step 3: Handle orphaned opening tag <think> by removing everything after it
-	// This assumes the closing </think> was truncated/missing
-	re3 := regexp.MustCompile(`(?s)<think>.*$`)
-	content = re3.ReplaceAllString(content, "")
-
-	// Step 4: Clean up extra whitespace
-	re4 := regexp.MustCompile(`\n\s*\n\s*\n+`)
-	content = re4.ReplaceAllString(content, "\n\n")
-
-	return strings.TrimSpace(content)
-}
-
-func updateMemoryFile(messages []openai.ChatCompletionMessageParamUnion) error {
-	memoryDir := cfig.AgentWorkDir + "/memory"
-	if err := os.MkdirAll(memoryDir, 0755); err != nil {
-		return err
-	}
-
-	filepath := fmt.Sprintf("%s/%s.jsonl", memoryDir, time.Now().Format("2006-01-02"))
-
-	// Check file size before appending to prevent unbounded growth
-	if info, err := os.Stat(filepath); err == nil {
-		const maxSize = 10 * 1024 * 1024 // 10MB
-		if info.Size() > maxSize {
-			// Archive old file
-			archivePath := fmt.Sprintf("%s.%d", filepath, time.Now().Unix())
-			if err := os.Rename(filepath, archivePath); err != nil {
-				return fmt.Errorf("failed to archive memory: %w", err)
-			}
-		}
-	}
-
-	file, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	timestamp := time.Now().Format("15:04:05")
-
-	// Only save user and assistant messages (skip system and tool messages)
-	for _, msg := range messages {
-		var entry MemoryEntry
-		entry.Timestamp = timestamp
-
-		if msg.OfUser != nil {
-			entry.Role = "user"
-			if msg.OfUser.Content.OfString.String() != "" {
-				entry.Content = msg.OfUser.Content.OfString.Value
-			}
-		} else if msg.OfAssistant != nil {
-			entry.Role = "assistant"
-
-			if msg.OfAssistant.Content.OfString.String() != "" {
-				entry.Content = cleanThinkingTags(msg.OfAssistant.Content.OfString.Value)
-			} else {
-				continue // Skip if no content
-			}
-		} else {
-			continue
-		}
-
-		// Only write entries with content
-		if entry.Content != "" {
-			if err := encoder.Encode(entry); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }

@@ -7,26 +7,33 @@ import (
 	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
-	"github.com/Shreehari-Acharya/vayuu/internal/prompts"
 	"github.com/openai/openai-go/v3"
 )
 
-type Agent struct {
-	client *openai.Client
-	model  string
-	tools  map[string]Tool
-}
-
-func NewAgent(systemPrompt string, cfg *config.Config) *Agent {
-	llm := createLLMInstance(cfg)
-
-	return &Agent{
-		client: llm,
-		model:  cfg.Model,
-		tools:  make(map[string]Tool),
+// CreateAgent initializes a new Agent with the given configuration.
+func CreateAgent(systemPrompt string, cfg *config.Config) (*Agent, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config is nil")
 	}
+	if cfg.Model == "" {
+		return nil, fmt.Errorf("model is empty")
+	}
+
+	agent := &Agent{
+		client:       createLLMInstance(cfg),
+		model:        cfg.Model,
+		tools:        make(map[string]Tool),
+		toolsDirty:   true,
+		systemPrompt: systemPrompt,
+		workDir:      cfg.AgentWorkDir,
+		memoryWriter: NewFileMemoryWriter(cfg.AgentWorkDir),
+		logf:         fmt.Printf,
+	}
+
+	return agent, nil
 }
 
+// RegisterTool adds a tool to the agent's available tools.
 func (a *Agent) RegisterTool(tool Tool) error {
 	if a.tools == nil {
 		a.tools = make(map[string]Tool)
@@ -45,113 +52,199 @@ func (a *Agent) RegisterTool(tool Tool) error {
 	}
 
 	a.tools[tool.Name] = tool
+	a.toolsDirty = true
+	a.toolsCache = nil
 	return nil
 }
 
-const (
-	maxLLMErrors           = 3
-	maxIterations          = 20
-	temperatureLow float64 = 0.2
-)
-
+// RunAgent executes the agent loop with the given user input.
+// It iteratively calls the LLM, handles tool invocations, and returns the final response.
 func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) {
-	fmt.Printf("\n[%s] User: %s\n", time.Now().Format("15:04:05"), userInput)
+	logger := a.logger()
+	logger("\n[%s] User: %s\n", time.Now().Format(clockLayout), userInput)
 
-	messages := []openai.ChatCompletionMessageParamUnion{
-		systemMsg(prompts.SystemPrompt),
-		userMsg(userInput),
+	// Initialize conversation with system and user messages
+	messages := a.initializeMessages(userInput)
+
+	// Run the agentic loop
+	response, conversationHistory, err := a.executeAgentLoop(ctx, messages)
+	if err != nil {
+		return "", err
 	}
 
-	errCount := 0
+	// Persist the conversation for future reference
+	if a.memoryWriter != nil {
+		if err := a.memoryWriter.Write(conversationHistory); err != nil {
+			logger("Warning: failed to update memory: %s\n", err.Error())
+		}
+	}
+
+	logger("[%s] Assistant: %s\n\n", time.Now().Format(clockLayout), response)
+	return response, nil
+}
+
+// initializeMessages creates the initial message list with system and user messages.
+func (a *Agent) initializeMessages(userInput string) []openai.ChatCompletionMessageParamUnion {
+	return []openai.ChatCompletionMessageParamUnion{
+		systemMsg(a.systemPrompt),
+		userMsg(userInput),
+	}
+}
+
+// executeAgentLoop runs the main agent loop, handling LLM responses and tool calls.
+func (a *Agent) executeAgentLoop(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion) (string, []openai.ChatCompletionMessageParamUnion, error) {
+	consecutiveErrors := 0
 	iterations := 0
-	var finalResponse string
+	logger := a.logger()
 
 	for {
-		// Safety checks
-		if errCount >= maxLLMErrors {
-			return "", fmt.Errorf("exceeded maximum LLM errors (%d)", maxLLMErrors)
+		// Check iteration limits and cancellation
+		if err := ctx.Err(); err != nil {
+			return "", messages, err
 		}
-		if iterations >= maxIterations {
-			return "", fmt.Errorf("exceeded maximum iterations (%d)", maxIterations)
+		if iterations >= maxAgentIterations {
+			return "", messages, fmt.Errorf("exceeded maximum agent iterations (%d)", maxAgentIterations)
+		}
+		if consecutiveErrors >= maxConsecutiveLLMErrors {
+			return "", messages, fmt.Errorf("exceeded maximum consecutive LLM errors (%d)", maxConsecutiveLLMErrors)
 		}
 		iterations++
 
-		// Get LLM response
-		resp, err := a.getLLMResponse(ctx, messages)
+		// Request LLM response
+		resp, err := a.requestCompletion(ctx, messages)
 		if err != nil {
-			fmt.Printf("LLM Error (attempt %d/%d): %s\n", errCount+1, maxLLMErrors, err.Error())
-			errCount++
-			continue
-		}
-		errCount = 0
-
-		msg := resp.Choices[0].Message
-
-		// Handle tool calls
-		if len(msg.ToolCalls) > 0 {
-			messages = append(messages, assistantMsgFromResponse(msg))
-
-			if err := a.handleToolCalls(msg, &messages); err != nil {
-				return "", err
-			}
+			consecutiveErrors++
+			logger("LLM error (attempt %d/%d): %s\n", consecutiveErrors, maxConsecutiveLLMErrors, err.Error())
 			continue
 		}
 
-		// Final response - this is what gets returned to user
-		finalResponse = cleanThinkingTags(msg.Content)
-		messages = append(messages, assistantMsgFromResponse(msg))
-		break
-	}
+		// Reset error counter on successful LLM call
+		consecutiveErrors = 0
 
-	// Update memory with the complete conversation
-	if err := updateMemoryFile(messages); err != nil {
-		fmt.Printf("Memory update failed: %s\n", err.Error())
-	}
+		llmMessage := resp.Choices[0].Message
 
-	fmt.Printf("[%s] Assistant: %s\n\n", time.Now().Format("15:04:05"), finalResponse)
+		// Check if LLM wants to call tools
+		if len(llmMessage.ToolCalls) > 0 {
+			// Add assistant's tool call message to history
+			messages = append(messages, assistantMsg(llmMessage))
 
-	return finalResponse, nil
-}
-
-func (a *Agent) getLLMResponse(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion) (*openai.ChatCompletion, error) {
-	return a.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:       a.model,
-		Messages:    messages,
-		Tools:       buildOpenAITools(a.tools),
-		Temperature: openai.Float(temperatureLow),
-	})
-}
-
-func (a *Agent) handleToolCalls(msg openai.ChatCompletionMessage, messages *[]openai.ChatCompletionMessageParamUnion) error {
-	fmt.Printf("Executing %d tool(s)...\n", len(msg.ToolCalls))
-
-	for i, tc := range msg.ToolCalls {
-		tool, ok := a.tools[tc.Function.Name]
-		if !ok {
-			availableTools := make([]string, 0, len(a.tools))
-			for name := range a.tools {
-				availableTools = append(availableTools, name)
+			// Execute the tool calls and add results to history
+			if err := a.executeTools(llmMessage, &messages); err != nil {
+				return "", messages, err
 			}
-			return fmt.Errorf("unknown tool: %s (available: %v)", tc.Function.Name, availableTools)
+
+			// Continue loop for next LLM call
+			continue
 		}
 
-		var args map[string]any
-		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-			return fmt.Errorf("tool %s: failed to parse arguments: %w\nArguments: %s", tc.Function.Name, err, tc.Function.Arguments)
+		// LLM provided final response (no tool calls)
+		finalResponse := cleanThinkingTags(llmMessage.Content)
+		messages = append(messages, assistantMsg(llmMessage))
+
+		return finalResponse, messages, nil
+	}
+}
+
+// executeTools executes all tool calls from the LLM message and appends results to message history.
+func (a *Agent) executeTools(llmMessage openai.ChatCompletionMessage, messages *[]openai.ChatCompletionMessageParamUnion) error {
+	a.logger()("Executing %d tool(s)...\n", len(llmMessage.ToolCalls))
+
+	for i, toolCall := range llmMessage.ToolCalls {
+		if err := a.executeSingleTool(i, toolCall, messages); err != nil {
+			return err
 		}
-
-		startTime := time.Now()
-		result := tool.Handler(args)
-		elapsed := time.Since(startTime)
-
-		preview := result
-		if len(result) > 50 {
-			preview = result[:47] + "..."
-		}
-		fmt.Printf("   %d. %s (%v) --- %s\n", i+1, tc.Function.Name, elapsed, preview)
-
-		*messages = append(*messages, toolCallMsg(tc.ID, result))
 	}
 
 	return nil
+}
+
+// executeSingleTool executes a single tool call and records the result.
+func (a *Agent) executeSingleTool(index int, toolCall openai.ChatCompletionMessageToolCallUnion, messages *[]openai.ChatCompletionMessageParamUnion) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("tool %s panicked: %v", toolCall.Function.Name, r)
+		}
+	}()
+
+	// Validate tool exists
+	tool, ok := a.tools[toolCall.Function.Name]
+	if !ok {
+		return a.toolNotFoundError(toolCall.Function.Name)
+	}
+
+	// Parse tool arguments
+	args := map[string]any{}
+	if toolCall.Function.Arguments != "" {
+		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+			return fmt.Errorf("tool %s: failed to parse arguments: %w\nArguments: %s", toolCall.Function.Name, err, toolCall.Function.Arguments)
+		}
+	}
+
+	// Execute the tool and measure elapsed time
+	startTime := time.Now()
+	result := tool.Handler(args)
+	elapsed := time.Since(startTime)
+
+	// Log execution details with result preview
+	resultPreview := truncateString(result, resultPreviewLength, resultPreviewSuffix)
+	a.logger()("   %d. %s (%v) --- %s\n", index+1, toolCall.Function.Name, elapsed, resultPreview)
+
+	// Add tool result to message history
+	*messages = append(*messages, toolCallMsg(toolCall.ID, result))
+
+	return nil
+}
+
+// toolNotFoundError generates a helpful error message listing available tools.
+func (a *Agent) toolNotFoundError(toolName string) error {
+	availableTools := make([]string, 0, len(a.tools))
+	for name := range a.tools {
+		availableTools = append(availableTools, name)
+	}
+	return fmt.Errorf("unknown tool: %s (available: %v)", toolName, availableTools)
+}
+
+// truncateString truncates a string to a maximum length with an optional suffix.
+func truncateString(s string, maxLen int, suffix string) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-len(suffix)] + suffix
+}
+
+// requestCompletion requests a completion from the LLM with the current message history.
+func (a *Agent) requestCompletion(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion) (*openai.ChatCompletion, error) {
+	resp, err := a.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model:       a.model,
+		Messages:    messages,
+		Tools:       a.openAITools(),
+		Temperature: openai.Float(defaultTemperature),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("LLM returned no choices")
+	}
+
+	return resp, nil
+}
+
+// openAITools returns a cached list of OpenAI tool definitions.
+func (a *Agent) openAITools() []openai.ChatCompletionToolUnionParam {
+	if !a.toolsDirty && a.toolsCache != nil {
+		return a.toolsCache
+	}
+
+	a.toolsCache = buildOpenAITools(a.tools)
+	a.toolsDirty = false
+	return a.toolsCache
+}
+
+func (a *Agent) logger() Logf {
+	if a.logf != nil {
+		return a.logf
+	}
+
+	return fmt.Printf
 }
