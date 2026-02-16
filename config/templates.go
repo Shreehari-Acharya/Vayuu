@@ -2,11 +2,8 @@ package config
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-
-	"github.com/Shreehari-Acharya/vayuu/templates"
 )
 
 type TemplateFile struct {
@@ -26,34 +23,18 @@ func InitializeTemplates(workDir string) error {
 			return nil
 		} else {
 			fmt.Printf("Warning: failed to copy templates from source: %v\n", err)
+			
 		}
 	}
-
-	// Fall back to embedded templates
-	if err := copyTemplatesFromEmbedded(workDir); err == nil {
-		return nil
-	} else {
-		fmt.Printf("Warning: failed to copy embedded templates: %v\n", err)
-	}
-
-	// Last resort: create minimal defaults
-	return createDefaultTemplates(workDir)
+	return fmt.Errorf("No source templates found.")
 }
 
 // getSourceTemplatesDir finds the templates directory relative to the binary
 func getSourceTemplatesDir() string {
-	// Try multiple possible locations
-	possiblePaths := []string{
-		"./templates",
-		"../templates",
-		"../../templates",
-	}
 
-	for _, path := range possiblePaths {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			absPath, _ := filepath.Abs(path)
-			return absPath
-		}
+	if info, err := os.Stat(pathOfTemplate); err == nil && info.IsDir() {
+		absPath, _ := filepath.Abs(pathOfTemplate)
+		return absPath
 	}
 
 	return ""
@@ -108,44 +89,6 @@ func copyTemplatesFromSource(sourceDir, workDir string) error {
 	return nil
 }
 
-// copyTemplatesFromEmbedded copies templates from embedded filesystem to workspace
-func copyTemplatesFromEmbedded(workDir string) error {
-	return fs.WalkDir(templates.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if path == "." {
-			return nil
-		}
-
-		targetPath := filepath.Join(workDir, path)
-		if d.IsDir() {
-			return os.MkdirAll(targetPath, 0700)
-		}
-
-		// Don't overwrite existing files
-		if _, err := os.Stat(targetPath); err == nil {
-			return nil
-		}
-
-		content, err := fs.ReadFile(templates.EmbeddedFS, path)
-		if err != nil {
-			return fmt.Errorf("failed to read embedded template %s: %w", path, err)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0700); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(targetPath), err)
-		}
-
-		if err := os.WriteFile(targetPath, content, 0644); err != nil {
-			return fmt.Errorf("failed to write %s: %w", targetPath, err)
-		}
-
-		fmt.Printf("✓ Initialized: %s\n", filepath.Base(targetPath))
-		return nil
-	})
-}
-
 // copyFile copies a file only if it doesn't already exist
 func copyFile(src, dst string) error {
 	// Don't overwrite existing files (respect user customizations)
@@ -170,44 +113,6 @@ func copyFile(src, dst string) error {
 	}
 
 	fmt.Printf("✓ Initialized: %s\n", filepath.Base(dst))
-	return nil
-}
-
-// createDefaultTemplates creates minimal default templates
-func createDefaultTemplates(workDir string) error {
-	defaults := map[string]string{
-		"SOUL.md": `# SOUL.md — Your Agent Identity
-
-You are Vayuu, an intelligent assistant. Define your personality and values here.`,
-		"USER.md": `# USER.md — About Your User
-
-Describe the user you're assisting here.`,
-		"skills/readme.md": `# Skills
-
-Document special skills and capabilities here.`,
-	}
-
-	for path, content := range defaults {
-		fullPath := filepath.Join(workDir, path)
-
-		// Don't overwrite existing files
-		if _, err := os.Stat(fullPath); err == nil {
-			continue
-		}
-
-		// Create directories
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0700); err != nil {
-			return err
-		}
-
-		// Write file
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			return err
-		}
-
-		fmt.Printf("✓ Created default: %s\n", filepath.Base(path))
-	}
-
 	return nil
 }
 
