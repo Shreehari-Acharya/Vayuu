@@ -2,63 +2,39 @@ package telegram
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
 
-// handleMessage processes incoming messages
-func (tb *Bot) handleMessage(ctx context.Context, b *bot.Bot, update *models.Update) {
+func (tb *Bot) handleMessage(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return
 	}
 
-	
-	if tb.cfg.AllowedUsername != "" && update.Message.From.Username != tb.cfg.AllowedUsername {
-		log.Printf("Unauthorized user: %s", update.Message.From.Username)
+	username := update.Message.From.Username
+	if tb.cfg.AllowedUsername != "" && username != tb.cfg.AllowedUsername {
+		slog.Warn("rejected message from unauthorized user", "username", username)
 		return
 	}
 
-	// Update current chat ID for tools to use
 	tb.setCurrentChatID(update.Message.Chat.ID)
 
-	// Send typing indicator
-	if err := tb.sendTypingAction(); err != nil {
-		log.Printf("Typing indicator failed: %v", err)
+	if err := tb.sendTypingAction(ctx); err != nil {
+		slog.Debug("typing indicator failed", "error", err)
 	}
 
-	// Run agent
-	agentResponse, err := tb.agent.RunAgent(ctx, update.Message.Text)
+	slog.Info("processing message", "user", username, "chat_id", update.Message.Chat.ID)
+
+	response, err := tb.agent.RunAgent(ctx, update.Message.Text)
 	if err != nil {
-		log.Printf("Agent error: %v", err)
-		tb.SendMessage("Sorry, I encountered an error processing your request.")
+		slog.Error("agent failed", "error", err)
+		_ = tb.sendMessage(ctx, "Sorry, I encountered an error processing your request.")
 		return
 	}
 
-	// Send response
-	if err := tb.SendMessage(agentResponse); err != nil {
-		log.Printf("Send error: %v", err)
+	if err := tb.sendMessage(ctx, response); err != nil {
+		slog.Error("failed to send response", "error", err)
 	}
 }
-
-// // handleCallback can be added for inline buttons
-// func (tb *Bot) handleCallback(ctx context.Context, b *bot.Bot, update *models.Update) {
-// 	// Handle callback queries from inline keyboards
-// 	if update.CallbackQuery == nil {
-// 		return
-// 	}
-
-// 	// Implementation for callback handling
-// 	log.Printf("Received callback: %s", update.CallbackQuery.Data)
-// }
-
-// // handleDocument can be added for file uploads
-// func (tb *Bot) handleDocument(ctx context.Context, b *bot.Bot, update *models.Update) {
-// 	if update.Message == nil || update.Message.Document == nil {
-// 		return
-// 	}
-
-// 	// Handle document uploads
-// 	log.Printf("Received document: %s", update.Message.Document.FileName)
-// }

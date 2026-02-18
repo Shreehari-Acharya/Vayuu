@@ -1,8 +1,9 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -10,9 +11,9 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
-// sendMessage sends a text message to a chat
-func (tb *Bot) SendMessage(text string) error {
-	ctx := *tb.ctx
+const maxTelegramFileSize = 50 * 1024 * 1024
+
+func (tb *Bot) sendMessage(ctx context.Context, text string) error {
 	_, err := tb.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ParseMode: models.ParseModeMarkdownV1,
 		ChatID:    tb.currentChatID,
@@ -21,9 +22,7 @@ func (tb *Bot) SendMessage(text string) error {
 	return err
 }
 
-// sendTypingAction shows the typing indicator
-func (tb *Bot) sendTypingAction() error {
-	ctx := *tb.ctx
+func (tb *Bot) sendTypingAction(ctx context.Context) error {
 	_, err := tb.bot.SendChatAction(ctx, &bot.SendChatActionParams{
 		ChatID: tb.currentChatID,
 		Action: models.ChatActionTyping,
@@ -31,118 +30,50 @@ func (tb *Bot) sendTypingAction() error {
 	return err
 }
 
-// SendFileToCurrentChat sends a file to the current active chat
-// This method is exposed to the tools package
-func (tb *Bot) SendFileToCurrentChat(filePath, caption string) error {
+func (tb *Bot) sendFileToCurrentChat(filePath, caption string) error {
 	if tb.currentChatID == 0 {
 		return fmt.Errorf("no active chat")
 	}
-
-	ctx := *tb.ctx
-
-	// Check if context is cancelled
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("context cancelled: %w", ctx.Err())
-	default:
-	}
-
-	return tb.sendFile(filePath, caption)
+	return tb.sendDocument(context.Background(), filePath, caption)
 }
 
-// sendFile sends a file to a specific chat
-func (tb *Bot) sendFile(filePath string, caption string) error {
-	// Validate file
-	if err := tb.validateFile(filePath); err != nil {
+func (tb *Bot) sendDocument(ctx context.Context, filePath, caption string) error {
+	if err := validateFileForUpload(filePath); err != nil {
 		return err
 	}
 
-	// Open the file
-	fileData, err := os.Open(filePath)
+	f, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf("open file: %w", err)
 	}
-	defer fileData.Close()
-
-	filename := filepath.Base(filePath)
+	defer f.Close()
 
 	params := &bot.SendDocumentParams{
 		ChatID: tb.currentChatID,
 		Document: &models.InputFileUpload{
-			Filename: filename,
-			Data:     fileData,
+			Filename: filepath.Base(filePath),
+			Data:     f,
 		},
 	}
-
 	if caption != "" {
 		params.Caption = caption
 	}
 
-	// Use background context to avoid deadlock with parent context
-	ctx := *tb.ctx
-	_, err = tb.bot.SendDocument(ctx, params)
-	if err != nil {
-		return fmt.Errorf("failed to send document: %w", err)
+	if _, err := tb.bot.SendDocument(ctx, params); err != nil {
+		return fmt.Errorf("send document: %w", err)
 	}
 
-	log.Printf("Sent file to chat %d: %s", tb.currentChatID, filePath)
+	slog.Info("file sent", "chat_id", tb.currentChatID, "path", filePath)
 	return nil
 }
 
-// sendPhoto sends a photo to a chat
-// func (tb *Bot) sendPhoto(chatID int64, photoPath string, caption string) error {
-// 	fileData, err := os.Open(photoPath)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to open photo: %w", err)
-// 	}
-// 	defer fileData.Close()
-
-// 	params := &bot.SendPhotoParams{
-// 		ChatID: chatID,
-// 		Photo: &models.InputFileUpload{
-// 			Filename: filepath.Base(photoPath),
-// 			Data:     fileData,
-// 		},
-// 	}
-
-// 	if caption != "" {
-// 		params.Caption = caption
-// 	}
-
-// 	_, err = tb.bot.SendPhoto(*tb.ctx, params)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to send photo: %w", err)
-// 	}
-
-// 	return nil
-// }
-
-// sendMessageWithKeyboard sends a message with inline keyboard
-// func (tb *Bot) sendMessageWithKeyboard(chatID int64, text string, keyboard [][]models.InlineKeyboardButton) error {
-// 	_, err := tb.bot.SendMessage(*tb.ctx, &bot.SendMessageParams{
-// 		ChatID: chatID,
-// 		Text:   text,
-// 		ReplyMarkup: &models.InlineKeyboardMarkup{
-// 			InlineKeyboard: keyboard,
-// 		},
-// 	})
-// 	return err
-// }
-
-// validateFile checks if a file is valid for sending
-func (tb *Bot) validateFile(filePath string) error {
-
-	info, err := os.Stat(filePath)
+func validateFileForUpload(path string) error {
+	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("file does not exist: %w", err)
 	}
-
-	// Telegram bot file size limit is 50MB
-	const maxFileSize = 50 * 1024 * 1024
-	if info.Size() > maxFileSize {
-		return fmt.Errorf("file too large (%.2f MB, max 50 MB)",
-			float64(info.Size())/(1024*1024))
+	if info.Size() > maxTelegramFileSize {
+		return fmt.Errorf("file too large (%.2f MB, max 50 MB)", float64(info.Size())/(1024*1024))
 	}
-
 	return nil
 }

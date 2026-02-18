@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/Shreehari-Acharya/vayuu/internal/agent"
@@ -13,17 +14,16 @@ import (
 type Bot struct {
 	bot           *bot.Bot
 	agent         *agent.Agent
+	cfg           *config.Config
+	toolEnv       *tools.ToolEnv
 	currentChatID int64
-	cfg 		 *config.Config
-	ctx           *context.Context
 }
 
-// NewBot creates and initializes a new Telegram bot
-func NewBot(cfg *config.Config, ctx *context.Context, agent *agent.Agent) (*Bot, error) {
-
+func NewBot(cfg *config.Config, agentInstance *agent.Agent, toolEnv *tools.ToolEnv) (*Bot, error) {
 	tb := &Bot{
-		agent: agent,
-		ctx:   ctx,
+		agent:   agentInstance,
+		cfg:     cfg,
+		toolEnv: toolEnv,
 	}
 
 	opts := []bot.Option{
@@ -32,31 +32,22 @@ func NewBot(cfg *config.Config, ctx *context.Context, agent *agent.Agent) (*Bot,
 
 	b, err := bot.New(cfg.TelegramToken, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create telegram bot: %w", err)
+		return nil, fmt.Errorf("create telegram bot: %w", err)
 	}
-
 	tb.bot = b
 
-	tb.cfg = cfg
-	// Inject file sender into tools
-	tools.SetFileSender(tb.SendFileToCurrentChat)
+	toolEnv.SetFileSender(tb.sendFileToCurrentChat)
+	slog.Info("telegram bot initialized")
 
 	return tb, nil
 }
 
-// Start begins listening for messages
 func (tb *Bot) Start(ctx context.Context) {
-	tb.ctx = &ctx
+	slog.Info("telegram bot started, listening for messages")
 	tb.bot.Start(ctx)
 }
 
-// GetCurrentChatID returns the current active chat ID
-func (tb *Bot) GetCurrentChatID() int64 {
-	return tb.currentChatID
-}
-
-// SetCurrentChatID updates the current chat ID
 func (tb *Bot) setCurrentChatID(chatID int64) {
 	tb.currentChatID = chatID
-	tools.SetCurrentChatID(chatID)
+	tb.toolEnv.SetCurrentChatID(chatID)
 }
