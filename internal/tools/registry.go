@@ -1,127 +1,83 @@
 package tools
 
-import "github.com/Shreehari-Acharya/vayuu/internal/agent"
-
-// toolMetadata defines the structure for tool definitions
-type toolMetadata struct {
+type toolDef struct {
 	name        string
 	description string
 	parameters  map[string]any
 	handler     func(map[string]any) string
 }
 
-// toolDefinitions holds all tool configurations
-var toolDefinitions = []toolMetadata{
-	{
-		name:        "read_file",
-		description: "Read the contents of a file(s) at the given path",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type": "string",
+func buildToolDefs(env *ToolEnv) []toolDef {
+	return []toolDef{
+		{
+			name:        "read_file",
+			description: "Read the contents of one or more files at the given path(s)",
+			parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "string"},
 					},
 				},
+				"required": []string{"path"},
 			},
-			"required": []string{"path"},
+			handler: env.readFile,
 		},
-		handler: ReadFile,
-	},
-	{
-		name:        "write_file",
-		description: "Write content to a file at the given path",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type": "string",
+		{
+			name:        "write_file",
+			description: "Write content to a file at the given path",
+			parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":    map[string]any{"type": "string"},
+					"content": map[string]any{"type": "string"},
 				},
-				"content": map[string]any{
-					"type": "string",
-				},
+				"required": []string{"path", "content"},
 			},
-			"required": []string{"path", "content"},
+			handler: env.writeFile,
 		},
-		handler: WriteFile,
-	},
-	{
-		name:        "execute_command",
-		description: "Execute bash command(s) on the local system",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"command": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type": "string",
+		{
+			name:        "execute_command",
+			description: "Execute bash command(s) on the local system",
+			parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"command": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "string"},
 					},
 				},
+				"required": []string{"command"},
 			},
-			"required": []string{"command"},
+			handler: env.executeCommand,
 		},
-		handler: ExecuteCommand,
-	},
-	{
-		name:        "send_file",
-		description: "Send a file to the user",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type":        "string",
-					"description": "Path to the file to send",
+		{
+			name:        "send_file",
+			description: "Send a file to the user via Telegram",
+			parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":    map[string]any{"type": "string", "description": "Path to the file to send"},
+					"caption": map[string]any{"type": "string", "description": "Optional caption for the file"},
 				},
-				"caption": map[string]any{
-					"type":        "string",
-					"description": "Optional caption for the file",
-				},
+				"required": []string{"path"},
 			},
-			"required": []string{"path"},
+			handler: env.sendFile,
 		},
-		handler: SendFile,
-	},
-	{
-		name:        "edit_file",
-		description: "Edit a file by replacing a specific string with a new string. The old_string must match exactly (including whitespace and line breaks) and appear only once in the file.",
-		parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path": map[string]any{
-					"type":        "string",
-					"description": "Path to the file to edit",
+		{
+			name:        "edit_file",
+			description: "Edit a file by replacing an exact string match with a new string. The old_string must appear exactly once.",
+			parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":       map[string]any{"type": "string", "description": "Path to the file to edit"},
+					"old_string": map[string]any{"type": "string", "description": "Exact string to find (must match once)"},
+					"new_string": map[string]any{"type": "string", "description": "Replacement string"},
 				},
-				"old_string": map[string]any{
-					"type":        "string",
-					"description": "The exact string to find and replace (must match exactly including whitespace)",
-				},
-				"new_string": map[string]any{
-					"type":        "string",
-					"description": "The new string to replace the old_string with",
-				},
+				"required": []string{"path", "old_string", "new_string"},
 			},
-			"required": []string{"path", "old_string", "new_string"},
+			handler: env.editFile,
 		},
-		handler: EditFile,
-	},
-}
-
-// toAgentTool converts toolMetadata to agent.Tool
-func (tm toolMetadata) toAgentTool() agent.Tool {
-	return agent.Tool{
-		Name:        tm.name,
-		Description: tm.description,
-		Parameters:  tm.parameters,
-		Handler:     tm.handler,
 	}
-}
-
-// GetAllTools returns all available tools as agent.Tool instances
-func getAllTools() []agent.Tool {
-	tools := make([]agent.Tool, len(toolDefinitions))
-	for i, def := range toolDefinitions {
-		tools[i] = def.toAgentTool()
-	}
-	return tools
 }

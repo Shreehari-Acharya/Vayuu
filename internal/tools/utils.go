@@ -7,79 +7,54 @@ import (
 	"strings"
 )
 
-// ValidatePath ensures a file path is within the agent work directory (prevents path traversal)
-func ValidatePath(relativePath string) (string, error) {
+func (e *ToolEnv) validatePath(relativePath string) (string, error) {
 	if strings.TrimSpace(relativePath) == "" {
-		return "", fmt.Errorf("path cannot be empty")
-	}
-	
-	if(relativePath[0] == '~') {
-		relativePath = handleTildeInPath(relativePath)
-		return relativePath, nil
+		return "", fmt.Errorf("path must not be empty")
 	}
 
-	fullPath := filepath.Join(agentWorkDir, relativePath)
-
-	// Security: Prevent path traversal
-	cleanPath := filepath.Clean(fullPath)
-	cleanWorkDir := filepath.Clean(agentWorkDir)
-	if !strings.HasPrefix(cleanPath, cleanWorkDir) {
-		return "", fmt.Errorf("path traversal not allowed")
+	if strings.HasPrefix(relativePath, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve home directory: %w", err)
+		}
+		return filepath.Clean(filepath.Join(home, relativePath[2:])), nil
 	}
 
+	fullPath := filepath.Clean(filepath.Join(e.WorkDir, relativePath))
+	cleanWorkDir := filepath.Clean(e.WorkDir)
+	if !strings.HasPrefix(fullPath, cleanWorkDir) {
+		return "", fmt.Errorf("path traversal not allowed: %s", relativePath)
+	}
 	return fullPath, nil
 }
 
-
-// IsFileDirectory checks if a path points to a directory
-func IsFileDirectory(fullPath string) bool {
-	info, err := os.Stat(fullPath)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
+func isDirectory(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
-// GetFileSize returns the size of a file
-func GetFileSize(fullPath string) (int64, error) {
-	info, err := os.Stat(fullPath)
+func fileSize(path string) (int64, error) {
+	info, err := os.Stat(path)
 	if err != nil {
 		return 0, err
 	}
 	return info.Size(), nil
 }
 
-// IsProtectedFile checks if a file is protected from operations like deletion
-func IsProtectedFile(path string) bool {
-	for _, pattern := range ProtectedPatterns {
-		if strings.Contains(path, pattern) {
-			return true
-		}
-	}
-	return false
-}
-
-// FormatBytes converts bytes to human-readable format
-func FormatBytes(bytes int64) string {
+func formatBytes(bytes int64) string {
 	const (
-		KB = 1024
-		MB = KB * 1024
-		GB = MB * 1024
+		kb = 1024
+		mb = kb * 1024
+		gb = mb * 1024
 	)
-
 	switch {
-	case bytes >= GB:
-		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GB))
-	case bytes >= MB:
-		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(MB))
-	case bytes >= KB:
-		return fmt.Sprintf("%.2f KB", float64(bytes)/float64(KB))
+	case bytes >= gb:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(gb))
+	case bytes >= mb:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(mb))
+	case bytes >= kb:
+		return fmt.Sprintf("%.2f KB", float64(bytes)/float64(kb))
 	default:
 		return fmt.Sprintf("%d B", bytes)
 	}
-}
-
-// EnsureDirectoryExists creates a directory if it doesn't exist
-func EnsureDirectoryExists(dirPath string) error {
-	return os.MkdirAll(dirPath, 0755)
 }

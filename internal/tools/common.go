@@ -2,84 +2,66 @@ package tools
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 
-	"github.com/Shreehari-Acharya/vayuu/config"
 	"github.com/Shreehari-Acharya/vayuu/internal/agent"
 )
 
-// agentWorkDir is the working directory for all agent operations
-// It's initialized from the config on package load
-var (
-	agentWorkDir  string
-	fileSender    func(filePath, caption string) error
-	currentChatID int64
-	mu            sync.RWMutex // Protect concurrent access
-)
+type FileSenderFunc func(filePath, caption string) error
 
-func Initialize(cfg *config.Config, agent *agent.Agent) error {
-	if cfg != nil {
-		agentWorkDir = cfg.AgentWorkDir
-	}
-
-	// Validate work directory before registering tools
-	if err := ValidateWorkDir(); err != nil {
-		return fmt.Errorf("invalid work directory: %w", err)
-	}
-
-	// register all tools at initialization
-	tools := getAllTools()
-	for _, tool := range tools {
-		if err := agent.RegisterTool(tool); err != nil {
-			return fmt.Errorf("failed to register tool %s: %w", tool.Name, err)
-		}
-	}
-
-	return nil
+type ToolEnv struct {
+	WorkDir       string
+	FileSender    FileSenderFunc
+	CurrentChatID int64
+	mu            sync.RWMutex
 }
 
-func handleTildeInPath(path string) string {
-	if len(path) > 0 && path[0] == '~' {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			return homeDir + path[1:]
-		}
+func NewToolEnv(workDir string) (*ToolEnv, error) {
+	if workDir == "" {
+		return nil, fmt.Errorf("work directory must not be empty")
 	}
-	return "failed to get user home directory"
-}
-
-// GetAgentWorkDir returns the working directory for agent operations
-func GetAgentWorkDir() string {
-	return agentWorkDir
-}
-
-func SetFileSender(sender func(filePath, caption string) error) {
-	mu.Lock()
-	defer mu.Unlock()
-	fileSender = sender
-}
-
-func SetCurrentChatID(chatID int64) {
-	mu.Lock()
-	defer mu.Unlock()
-	currentChatID = chatID
-}
-
-// ValidateWorkDir validates that the work directory exists and is accessible
-func ValidateWorkDir() error {
-	if agentWorkDir == "" {
-		return fmt.Errorf("work directory not set")
-	}
-
-	info, err := os.Stat(agentWorkDir)
+	info, err := os.Stat(workDir)
 	if err != nil {
-		return fmt.Errorf("cannot access work directory: %w", err)
+		return nil, fmt.Errorf("cannot access work directory %q: %w", workDir, err)
 	}
-
 	if !info.IsDir() {
-		return fmt.Errorf("work directory is not a directory: %s", agentWorkDir)
+		return nil, fmt.Errorf("work directory is not a directory: %s", workDir)
 	}
+	return &ToolEnv{WorkDir: workDir}, nil
+}
 
+func (e *ToolEnv) SetFileSender(sender FileSenderFunc) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.FileSender = sender
+}
+
+func (e *ToolEnv) SetCurrentChatID(chatID int64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.CurrentChatID = chatID
+}
+
+func (e *ToolEnv) getFileSender() FileSenderFunc {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.FileSender
+}
+
+func RegisterAll(env *ToolEnv, a *agent.Agent) error {
+	for _, def := range buildToolDefs(env) {
+		tool := agent.Tool{
+			Name:        def.name,
+			Description: def.description,
+			Parameters:  def.parameters,
+			Handler:     def.handler,
+		}
+		if err := a.RegisterTool(tool); err != nil {
+			return fmt.Errorf("register tool %q: %w", def.name, err)
+		}
+		slog.Debug("registered tool", "name", def.name)
+	}
 	return nil
 }
