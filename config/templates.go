@@ -2,157 +2,54 @@ package config
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/Shreehari-Acharya/vayuu/templates"
 )
 
-type TemplateFile struct {
-	Name    string
-	Content string
-}
-
-// InitializeTemplates copies template files from source to workspace if they don't exist
-// This is called during setup and also on first run if templates are missing
 func InitializeTemplates(workDir string) error {
-	// Get the source templates directory (relative to the binary location)
-	sourceDir := getSourceTemplatesDir()
-
-	if sourceDir != "" {
-		// Copy templates from source
-		if err := copyTemplatesFromSource(sourceDir, workDir); err == nil {
+	return fs.WalkDir(templates.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return os.MkdirAll(filepath.Join(workDir, path), 0700)
+		}
+		if filepath.Ext(path) != ".md" {
 			return nil
-		} else {
-			fmt.Printf("Warning: failed to copy templates from source: %v\n", err)
-			
 		}
-	}
-	return fmt.Errorf("No source templates found.")
+		return copyEmbeddedFile(templates.EmbeddedFS, path, filepath.Join(workDir, path))
+	})
 }
 
-// getSourceTemplatesDir finds the templates directory relative to the binary
-func getSourceTemplatesDir() string {
-
-	if info, err := os.Stat(pathOfTemplate); err == nil && info.IsDir() {
-		absPath, _ := filepath.Abs(pathOfTemplate)
-		return absPath
-	}
-
-	return ""
-}
-
-// copyTemplatesFromSource copies templates from source directory to workspace
-func copyTemplatesFromSource(sourceDir, workDir string) error {
-	entries, err := os.ReadDir(sourceDir)
-	if err != nil {
-		return fmt.Errorf("failed to read source templates: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			// Handle subdirectories like 'skills'
-			subDir := filepath.Join(sourceDir, entry.Name())
-			targetDir := filepath.Join(workDir, entry.Name())
-
-			if err := os.MkdirAll(targetDir, 0700); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", targetDir, err)
-			}
-
-			// Copy files from subdirectory
-			subEntries, _ := os.ReadDir(subDir)
-			for _, subEntry := range subEntries {
-				if !subEntry.IsDir() {
-					if filepath.Ext(subEntry.Name()) != ".md" {
-						continue
-					}
-					if err := copyFile(
-						filepath.Join(subDir, subEntry.Name()),
-						filepath.Join(targetDir, subEntry.Name()),
-					); err != nil {
-						return err
-					}
-				}
-			}
-		} else {
-			// Copy root level files
-			if filepath.Ext(entry.Name()) != ".md" {
-				continue
-			}
-			if err := copyFile(
-				filepath.Join(sourceDir, entry.Name()),
-				filepath.Join(workDir, entry.Name()),
-			); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// copyFile copies a file only if it doesn't already exist
-func copyFile(src, dst string) error {
-	// Don't overwrite existing files (respect user customizations)
+func copyEmbeddedFile(fsys fs.FS, src, dst string) error {
 	if _, err := os.Stat(dst); err == nil {
-		return nil // File exists, skip
+		return nil
 	}
 
-	// Ensure target directory exists
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return err
 	}
 
-	// Read source file
-	content, err := os.ReadFile(src)
+	content, err := fs.ReadFile(fsys, src)
 	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", src, err)
+		return fmt.Errorf("read embedded %s: %w", src, err)
 	}
 
-	// Write to destination
 	if err := os.WriteFile(dst, content, 0644); err != nil {
-		return fmt.Errorf("failed to write %s: %w", dst, err)
+		return fmt.Errorf("write %s: %w", dst, err)
 	}
 
-	fmt.Printf("✓ Initialized: %s\n", filepath.Base(dst))
+	fmt.Printf("  initialized: %s\n", filepath.Base(dst))
 	return nil
 }
 
-// LoadTemplate loads a template from workspace
-// Returns empty string if not found (agent will handle gracefully)
 func LoadTemplate(workDir, templateName string) string {
-	templatePath := filepath.Join(workDir, templateName)
-
-	if content, err := os.ReadFile(templatePath); err == nil {
-		return string(content)
+	content, err := os.ReadFile(filepath.Join(workDir, templateName))
+	if err != nil {
+		return ""
 	}
-
-	return ""
-}
-
-// HasCustomTemplate checks if user has customized a template
-func HasCustomTemplate(workDir, templateName string) bool {
-	templatePath := filepath.Join(workDir, templateName)
-	_, err := os.Stat(templatePath)
-	return err == nil
-}
-
-// ResetTemplate resets a template by deleting it (will be recreated from source on next init)
-func ResetTemplate(workDir, templateName string) error {
-	templatePath := filepath.Join(workDir, templateName)
-
-	// Backup current version
-	backupPath := templatePath + ".backup"
-	if content, err := os.ReadFile(templatePath); err == nil {
-		if err := os.WriteFile(backupPath, content, 0644); err != nil {
-			return fmt.Errorf("failed to backup template: %w", err)
-		}
-		fmt.Printf("✓ Backup created: %s\n", filepath.Base(templatePath)+".backup")
-	}
-
-	// Delete the file so it will be recreated from source
-	if err := os.Remove(templatePath); err != nil {
-		return fmt.Errorf("failed to delete template: %w", err)
-	}
-
-	fmt.Printf("✓ Template will be reset on next run: %s\n", templateName)
-	return nil
+	return string(content)
 }

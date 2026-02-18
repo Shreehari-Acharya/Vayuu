@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // RunSetup runs the interactive configuration setup
@@ -199,15 +198,3 @@ func (m setupModel) progressPercent() float64 {
 	}
 	return float64(m.index) / float64(len(m.fields))
 }
-
-var (
-	headerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	subtitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
-	stepStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true)
-	labelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("51")).Bold(true)
-	hintStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true)
-	inputBoxStyle = lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63"))
-	errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-)

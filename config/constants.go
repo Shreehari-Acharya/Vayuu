@@ -1,8 +1,11 @@
 package config
 
+import (
+	"github.com/charmbracelet/lipgloss"
+)
+
 const (
 	configFileName = "vayuuConfig.json"
-	pathOfTemplate = "../templates"
 	vayuuASCII     = `██╗   ██╗ █████╗ ██╗   ██╗██╗   ██╗██╗   ██╗
 ██║   ██║██╔══██╗╚██╗ ██╔╝██║   ██║██║   ██║
 ██║   ██║███████║ ╚████╔╝ ██║   ██║██║   ██║
@@ -10,12 +13,12 @@ const (
  ╚████╔╝ ██║  ██║   ██║   ╚██████╔╝╚██████╔╝
   ╚═══╝  ╚═╝  ╚═╝   ╚═╝    ╚═════╝  ╚═════╝ 
                                             `
-
 )
 
 var defaultWorkDirPath, _ = defaultWorkDir()
 
-var fields = []promptRequest{
+var (
+	fields = []promptRequest{
 		{
 			Label:    "Telegram Bot Token",
 			Help:     "Create a bot at https://t.me/BotFather and paste the token here.",
@@ -53,3 +56,13 @@ var fields = []promptRequest{
 			Required: true,
 		},
 	}
+	headerStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	subtitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	stepStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true)
+	labelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("51")).Bold(true)
+	hintStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true)
+	inputBoxStyle = lipgloss.NewStyle().Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63"))
+	errorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	successStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+)
