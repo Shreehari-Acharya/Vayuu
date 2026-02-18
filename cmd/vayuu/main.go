@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
@@ -15,56 +16,55 @@ import (
 	"github.com/Shreehari-Acharya/vayuu/internal/tools"
 )
 
-var agentInstance *agent.Agent
-var bot *telegram.Bot
-
 func main() {
-	// Check for setup command
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
 		if err := config.RunSetup(); err != nil {
-			fmt.Fprintf(os.Stderr, "Setup failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "setup failed: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		fmt.Fprintln(os.Stderr, "\nRun 'vayuu setup' to configure the application.")
 		os.Exit(1)
 	}
 
-	// create an agent
-	agentInstance, err = agent.CreateAgent(prompts.SystemPrompt, cfg)
+	agentInstance, err := agent.CreateAgent(prompts.SystemPrompt, cfg)
 	if err != nil {
-		panic(fmt.Errorf("failed to create agent: %w", err))
+		slog.Error("failed to create agent", "error", err)
+		os.Exit(1)
 	}
 
-	// assign tools to the agent
-	if err := tools.Initialize(cfg, agentInstance); err != nil {
-		panic(fmt.Errorf("failed to initialize tools: %w", err))
-	}
-
-	// start telegram bot with the agent
-	bot, err = telegram.NewBot(cfg, &ctx, agentInstance)
+	toolEnv, err := tools.NewToolEnv(cfg.AgentWorkDir)
 	if err != nil {
-		panic(err)
+		slog.Error("failed to initialize tool environment", "error", err)
+		os.Exit(1)
 	}
 
-	// Start bot in goroutine
+	if err := tools.RegisterAll(toolEnv, agentInstance); err != nil {
+		slog.Error("failed to register tools", "error", err)
+		os.Exit(1)
+	}
+
+	bot, err := telegram.NewBot(cfg, agentInstance, toolEnv)
+	if err != nil {
+		slog.Error("failed to create telegram bot", "error", err)
+		os.Exit(1)
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	go bot.Start(ctx)
-	log.Default().Println("Initialization complete. Bot is running. You can now interact with it on Telegram.")
+	slog.Info("bot is running — send a message on Telegram to interact")
 
-	// Wait for shutdown signal
 	<-ctx.Done()
-
-	// Graceful shutdown
-	log.Default().Println("Shutting down gracefully...")
-	time.Sleep(1 * time.Second)
-	log.Default().Println("Shutdown complete")
-
+	slog.Info("shutdown signal received, stopping...")
+	time.Sleep(500 * time.Millisecond)
+	slog.Info("shutdown complete")
 }
