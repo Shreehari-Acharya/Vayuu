@@ -4,19 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"sync"
 
 	"github.com/Shreehari-Acharya/vayuu/internal/agent"
 )
-
-type FileSenderFunc func(filePath, caption string) error
-
-type ToolEnv struct {
-	WorkDir       string
-	FileSender    FileSenderFunc
-	CurrentChatID int64
-	mu            sync.RWMutex
-}
 
 func NewToolEnv(workDir string) (*ToolEnv, error) {
 	if workDir == "" {

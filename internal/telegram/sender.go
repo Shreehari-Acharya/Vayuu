@@ -11,8 +11,6 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
-const maxTelegramFileSize = 50 * 1024 * 1024
-
 func (tb *Bot) sendMessage(ctx context.Context, text string) error {
 	_, err := tb.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ParseMode: models.ParseModeMarkdownV1,

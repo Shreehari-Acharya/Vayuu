@@ -11,14 +11,6 @@ import (
 	"github.com/go-telegram/bot"
 )
 
-type Bot struct {
-	bot           *bot.Bot
-	agent         *agent.Agent
-	cfg           *config.Config
-	toolEnv       *tools.ToolEnv
-	currentChatID int64
-}
-
 func NewBot(cfg *config.Config, agentInstance *agent.Agent, toolEnv *tools.ToolEnv) (*Bot, error) {
 	tb := &Bot{
 		agent:   agentInstance,

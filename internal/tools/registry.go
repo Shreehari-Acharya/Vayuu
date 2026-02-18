@@ -1,12 +1,5 @@
 package tools
 
-type toolDef struct {
-	name        string
-	description string
-	parameters  map[string]any
-	handler     func(map[string]any) string
-}
-
 func buildToolDefs(env *ToolEnv) []toolDef {
 	return []toolDef{
 		{
