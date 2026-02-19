@@ -32,8 +32,8 @@ func (e *ToolEnv) sendFile(args map[string]any) string {
 	}
 
 	if err := sender(fullPath, caption); err != nil {
-		return fmt.Sprintf("error sending file: %v", err)
+		return fmt.Sprintf("error sending content: %v", err)
 	}
 
-	return fmt.Sprintf("file sent: %s", pathStr)
+	return fmt.Sprintf("content sent: %s", pathStr)
 }

@@ -47,12 +47,23 @@ func buildToolDefs(env *ToolEnv) []toolDef {
 		},
 		{
 			name:        "send_file",
-			description: "Send a file to the user via Telegram",
+			description: "Send a file (image, video, document) to the user via Telegram. Type is auto-detected from file extension.",
 			parameters: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"path":    map[string]any{"type": "string", "description": "Path to the file to send"},
-					"caption": map[string]any{"type": "string", "description": "Optional caption for the file"},
+					"path": map[string]any{
+						"type":        "string",
+						"description": "Path to the file to send",
+					},
+					"caption": map[string]any{
+						"type":        "string",
+						"description": "Optional caption for the file",
+					},
+					"file_type": map[string]any{
+						"type":        "string",
+						"enum":        []string{"image", "doc", "video"},
+						"description": "Optional: type hint (image, video, doc). Auto-detected from extension if not provided.",
+					},
 				},
 				"required": []string{"path"},
 			},

@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-type FileSenderFunc func(filePath, caption string) error
+type FileSenderFunc func(content, caption string) error
 
 type ToolEnv struct {
 	WorkDir       string
