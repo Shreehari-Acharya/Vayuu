@@ -204,6 +204,8 @@ func configFromEnv(getEnv func(string) string) *Config {
 		Model:           getEnv("MODEL"),
 		AgentWorkDir:    getEnv("AGENT_WORKDIR"),
 		AllowedUsername: getEnv("ALLOWED_USERNAME"),
+		OllamaBaseURL:   getEnv("OLLAMA_BASE_URL"),
+		OllamaModel:     getEnv("OLLAMA_MODEL"),
 	}
 }
 

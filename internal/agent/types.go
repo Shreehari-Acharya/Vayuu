@@ -5,10 +5,6 @@ import (
 	"github.com/openai/openai-go/v3"
 )
 
-type MemoryWriter interface {
-	Write(messages []openai.ChatCompletionMessageParamUnion) error
-}
-
 type Agent struct {
 	client       *openai.Client
 	model        string
@@ -17,14 +13,8 @@ type Agent struct {
 	toolsDirty   bool
 	systemPrompt string
 	workDir      string
-	memoryWriter MemoryWriter
+	memoryWriter memory.MemoryWriter
 	memoryMgr    *memory.MemoryManager
-}
-
-type MemoryEntry struct {
-	Timestamp string `json:"timestamp"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
 }
 
 type ToolFunc func(args map[string]any) string

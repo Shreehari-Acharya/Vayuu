@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/Shreehari-Acharya/vayuu/config"
@@ -28,16 +27,21 @@ func CreateAgent(systemPrompt string, cfg *config.Config) (*Agent, error) {
 		toolsDirty:   true,
 		systemPrompt: systemPrompt,
 		workDir:      cfg.AgentWorkDir,
-		memoryWriter: NewFileMemoryWriter(cfg.AgentWorkDir),
+		memoryWriter: memory.NewFileMemoryWriter(cfg.AgentWorkDir),
 	}
 
-	mgr, err := memory.NewMemoryManager(memory.DefaultConfig())
+	mgr, err := memory.NewMemoryManagerWithDB(cfg.AgentWorkDir, cfg)
 	if err != nil {
-		slog.Warn("failed to initialize memory manager, continuing without it", "error", err)
+		slog.Warn("failed to initialize memory manager with DB, trying vector only", "error", err)
+		mgr, err = memory.NewMemoryManager(memory.DefaultConfig())
+		if err != nil {
+			slog.Warn("failed to initialize memory manager, continuing without it", "error", err)
+		}
 	} else {
-		agent.memoryMgr = mgr
-		slog.Info("memory manager initialized")
+		slog.Info("memory manager initialized with database")
 	}
+
+	agent.memoryMgr = mgr
 
 	return agent, nil
 }
@@ -93,65 +97,15 @@ func (a *Agent) RunAgent(ctx context.Context, userInput string) (string, error) 
 	}
 
 	if a.memoryMgr != nil && response != "" {
-		go a.extractAndStoreMemory(ctx, userInput, response)
+		go func() {
+			if err := a.memoryMgr.ProcessConversation(ctx, userInput, response); err != nil {
+				slog.Warn("failed to process conversation for memory", "error", err)
+			}
+		}()
 	}
 
 	slog.Info("agent completed", "response_len", len(response))
 	return response, nil
-}
-
-func (a *Agent) extractAndStoreMemory(ctx context.Context, userInput, assistantResponse string) {
-	if a.memoryMgr == nil {
-		return
-	}
-
-	facts := extractFacts(assistantResponse)
-	for _, fact := range facts {
-		if err := a.memoryMgr.AddFact(ctx, fact, map[string]string{
-			"source": "conversation",
-		}); err != nil {
-			slog.Warn("failed to store fact", "fact", fact, "error", err)
-		}
-	}
-}
-
-func extractFacts(text string) []string {
-	var facts []string
-
-	factIndicators := []string{
-		"remember that", "i prefer", "i like", "i don't like",
-		"my name is", "i am", "i live in", "i work as",
-		"always", "never", "usually",
-	}
-
-	lower := text
-	for _, indicator := range factIndicators {
-		if idx := contains(lower, indicator); idx != -1 {
-			sentence := extractSentence(lower, idx)
-			if len(sentence) > 10 && len(sentence) < 200 {
-				facts = append(facts, sentence)
-			}
-		}
-	}
-
-	return facts
-}
-
-func contains(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if len(s) >= i+len(substr) && s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
-func extractSentence(s string, start int) string {
-	end := start
-	for end < len(s) && s[end] != '.' && s[end] != '\n' {
-		end++
-	}
-	return strings.TrimSpace(s[start:end])
 }
 
 func (a *Agent) runLoop(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion) (string, []openai.ChatCompletionMessageParamUnion, error) {
@@ -180,7 +134,7 @@ func (a *Agent) runLoop(ctx context.Context, messages []openai.ChatCompletionMes
 		llmMsg := resp.Choices[0].Message
 
 		if len(llmMsg.ToolCalls) == 0 {
-			finalText := cleanThinkingTags(llmMsg.Content)
+			finalText := memory.CleanThinkingTags(llmMsg.Content)
 			messages = append(messages, assistantMsg(llmMsg))
 			return finalText, messages, nil
 		}

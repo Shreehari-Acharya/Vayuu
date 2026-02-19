@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 )
+
 // Config holds all application configuration
 type Config struct {
 	TelegramToken   string
@@ -12,8 +13,9 @@ type Config struct {
 	Model           string
 	AgentWorkDir    string
 	AllowedUsername string
+	OllamaBaseURL   string
+	OllamaModel     string
 }
-
 
 type promptRequest struct {
 	Label    string
