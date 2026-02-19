@@ -10,13 +10,17 @@ import (
 	"time"
 )
 
+// VectorStore provides a client for Qdrant vector database via REST API.
+// It handles storing and searching vector embeddings for semantic memory.
 type VectorStore struct {
-	baseURL    string
-	client     *http.Client
-	collection string
-	vectorDim  int
+	baseURL    string       // Qdrant REST API URL (http://localhost:6333)
+	client     *http.Client // HTTP client with timeout
+	collection string       // Name of the collection
+	vectorDim  int          // Dimension of vectors (e.g., 768 for nomic-embed-text)
 }
 
+// NewVectorStore creates a new VectorStore and ensures the collection exists.
+// Returns an error if Qdrant is not reachable or collection creation fails.
 func NewVectorStore(cfg *Config) (*VectorStore, error) {
 	vs := &VectorStore{
 		baseURL:    "http://localhost:6333",
@@ -32,7 +36,10 @@ func NewVectorStore(cfg *Config) (*VectorStore, error) {
 	return vs, nil
 }
 
+// ensureCollection checks if the collection exists, creating it if necessary.
+// Uses Cosine distance for similarity matching.
 func (vs *VectorStore) ensureCollection(ctx context.Context) error {
+	// Check if collection exists
 	req, err := http.NewRequestWithContext(ctx, "GET", vs.baseURL+"/collections/"+vs.collection, nil)
 	if err != nil {
 		return err
@@ -44,15 +51,17 @@ func (vs *VectorStore) ensureCollection(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
+	// Collection exists, nothing to do
 	if resp.StatusCode == 200 {
 		return nil
 	}
 
+	// Create collection
 	createReq := map[string]any{
 		"name": vs.collection,
 		"vectors": map[string]any{
 			"size":     vs.vectorDim,
-			"distance": "Cosine",
+			"distance": "Cosine", // Cosine similarity for semantic search
 		},
 	}
 
@@ -77,16 +86,20 @@ func (vs *VectorStore) ensureCollection(ctx context.Context) error {
 	return nil
 }
 
+// qdrantPoint represents a single point in Qdrant (ID + vector + payload)
 type qdrantPoint struct {
 	ID      interface{}    `json:"id"`
 	Vector  []float32      `json:"vector"`
 	Payload map[string]any `json:"payload"`
 }
 
+// upsertRequest is the request body for Qdrant's upsert endpoint
 type upsertRequest struct {
 	Points []qdrantPoint `json:"points"`
 }
 
+// Upsert stores or updates a memory in the vector database.
+// The ID should be unique - using UUID is recommended.
 func (vs *VectorStore) Upsert(ctx context.Context, id string, vector []float32, payload map[string]any) error {
 	point := qdrantPoint{
 		ID:      id,
@@ -118,12 +131,14 @@ func (vs *VectorStore) Upsert(ctx context.Context, id string, vector []float32, 
 	return nil
 }
 
+// searchRequest is the request body for Qdrant's search endpoint
 type searchRequest struct {
 	Vector      []float32 `json:"vector"`
 	Limit       int       `json:"limit"`
 	WithPayload bool      `json:"with_payload"`
 }
 
+// searchResponse parses Qdrant's search response
 type searchResponse struct {
 	Result []struct {
 		ID      interface{}    `json:"id"`
@@ -132,6 +147,8 @@ type searchResponse struct {
 	} `json:"result"`
 }
 
+// Search finds the most similar memories to the given vector.
+// Returns results sorted by similarity score (highest first).
 func (vs *VectorStore) Search(ctx context.Context, vector []float32, limit int, filter interface{}) ([]SearchResult, error) {
 	reqBody := searchRequest{
 		Vector:      vector,
@@ -163,6 +180,7 @@ func (vs *VectorStore) Search(ctx context.Context, vector []float32, limit int, 
 		return nil, err
 	}
 
+	// Convert Qdrant results to our SearchResult type
 	searchResults := make([]SearchResult, 0, len(result.Result))
 	for _, r := range result.Result {
 		content := ""
@@ -196,6 +214,7 @@ func (vs *VectorStore) Search(ctx context.Context, vector []float32, limit int, 
 	return searchResults, nil
 }
 
+// Delete removes a memory by ID from the vector store.
 func (vs *VectorStore) Delete(ctx context.Context, id string) error {
 	reqBody := map[string][]string{"points": {id}}
 	body, _ := json.Marshal(reqBody)
@@ -216,10 +235,8 @@ func (vs *VectorStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// Close implements the io.Closer interface.
+// Currently a no-op since HTTP client handles its own resources.
 func (vs *VectorStore) Close() error {
 	return nil
-}
-
-func parseTime(s string) interface{} {
-	return s
 }

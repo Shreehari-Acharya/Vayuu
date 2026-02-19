@@ -11,11 +11,14 @@ import (
 	"github.com/openai/openai-go/v3/option"
 )
 
+// FactExtractor uses an LLM to extract structured facts from conversations.
+// It analyzes conversation text and returns facts, preferences, and topics.
 type FactExtractor struct {
-	client *openai.Client
-	model  string
+	client *openai.Client // LLM client
+	model  string         // Model name for extraction
 }
 
+// NewFactExtractor creates a new FactExtractor using the provided config.
 func NewFactExtractor(cfg *config.Config) *FactExtractor {
 	client := openai.NewClient(
 		option.WithAPIKey(cfg.ApiKey),
@@ -27,13 +30,17 @@ func NewFactExtractor(cfg *config.Config) *FactExtractor {
 	}
 }
 
+// ExtractedFact represents a structured fact extracted from conversation.
+// Type can be: "fact", "preference", or "topic"
 type ExtractedFact struct {
-	Type     string `json:"type"` // "fact", "preference", "topic"
-	Key      string `json:"key"`  // e.g., "name", "food", "hobby"
-	Value    string `json:"value"`
-	Category string `json:"category,omitempty"`
+	Type     string `json:"type"`               // Type of fact
+	Key      string `json:"key"`                // Identifier (e.g., "name", "food")
+	Value    string `json:"value"`              // The extracted value
+	Category string `json:"category,omitempty"` // Category for preferences
 }
 
+// ExtractFacts analyzes a conversation and extracts structured information about the user.
+// Returns a slice of ExtractedFact or an error if extraction fails.
 func (e *FactExtractor) ExtractFacts(ctx context.Context, conversation string) ([]ExtractedFact, error) {
 	prompt := `Analyze the following conversation and extract structured information about the user.
 
@@ -57,8 +64,8 @@ Conversation:
 	resp, err := e.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: e.model,
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			systemMsg(`You extract structured facts from conversations. Always respond with valid JSON array.`),
-			userMsg(prompt),
+			newSystemMsg(`You extract structured facts from conversations. Always respond with valid JSON array.`),
+			newUserMsg(prompt),
 		},
 		Temperature: openai.Float(0.3),
 	})
@@ -70,6 +77,7 @@ Conversation:
 		return nil, fmt.Errorf("no response from LLM")
 	}
 
+	// Parse response, stripping any markdown code blocks
 	content := resp.Choices[0].Message.Content
 	content = strings.TrimSpace(content)
 	content = strings.TrimPrefix(content, "```json")
@@ -85,7 +93,8 @@ Conversation:
 	return facts, nil
 }
 
-func systemMsg(text string) openai.ChatCompletionMessageParamUnion {
+// newSystemMsg creates a system message for the LLM.
+func newSystemMsg(text string) openai.ChatCompletionMessageParamUnion {
 	return openai.ChatCompletionMessageParamUnion{
 		OfSystem: &openai.ChatCompletionSystemMessageParam{
 			Role: "system",
@@ -96,7 +105,8 @@ func systemMsg(text string) openai.ChatCompletionMessageParamUnion {
 	}
 }
 
-func userMsg(text string) openai.ChatCompletionMessageParamUnion {
+// newUserMsg creates a user message for the LLM.
+func newUserMsg(text string) openai.ChatCompletionMessageParamUnion {
 	return openai.ChatCompletionMessageParamUnion{
 		OfUser: &openai.ChatCompletionUserMessageParam{
 			Role: "user",

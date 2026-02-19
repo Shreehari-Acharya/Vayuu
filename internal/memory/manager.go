@@ -12,17 +12,23 @@ import (
 	"github.com/google/uuid"
 )
 
+// MemoryManager orchestrates all memory components:
+// - Vector store (Qdrant) for semantic search
+// - SQLite database for structured data
+// - Fact extractor (LLM) for auto-learning
 type MemoryManager struct {
-	embedder  *Embedder
-	store     *VectorStore
-	database  *Database
-	extractor *FactExtractor
-	config    *Config
+	embedder  *Embedder      // Generates embeddings
+	store     *VectorStore   // Vector database
+	database  *Database      // SQLite for structured data
+	extractor *FactExtractor // LLM for fact extraction
+	config    *Config        // Configuration
 
 	mu          sync.RWMutex
-	memoryCount int
+	memoryCount int // Total memories stored
 }
 
+// NewMemoryManager creates a MemoryManager with vector store only (no database).
+// Use NewMemoryManagerWithDB for full functionality including SQLite.
 func NewMemoryManager(cfg *Config) (*MemoryManager, error) {
 	embedder := NewEmbedder(cfg)
 
@@ -41,7 +47,10 @@ func NewMemoryManager(cfg *Config) (*MemoryManager, error) {
 	return mgr, nil
 }
 
+// NewMemoryManagerWithDB creates a MemoryManager with all components:
+// vector store, SQLite database, and fact extractor.
 func NewMemoryManagerWithDB(workDir string, cfg *config.Config) (*MemoryManager, error) {
+	// Set defaults for Ollama
 	ollamaURL := cfg.OllamaBaseURL
 	if ollamaURL == "" {
 		ollamaURL = "http://localhost:11434"
@@ -58,6 +67,7 @@ func NewMemoryManagerWithDB(workDir string, cfg *config.Config) (*MemoryManager,
 		VectorDim:      768,
 	}
 
+	// Initialize components
 	embedder := NewEmbedder(memConfig)
 
 	store, err := NewVectorStore(memConfig)
@@ -84,14 +94,18 @@ func NewMemoryManagerWithDB(workDir string, cfg *config.Config) (*MemoryManager,
 	return mgr, nil
 }
 
+// AddMemory stores a new memory in the vector database with its embedding.
+// Thread-safe for concurrent calls.
 func (m *MemoryManager) AddMemory(ctx context.Context, content string, memType MemoryType, metadata map[string]string) error {
 	start := time.Now()
 
+	// Generate embedding for the content
 	vector, err := m.embedder.Embed(ctx, content)
 	if err != nil {
 		return fmt.Errorf("generate embedding: %w", err)
 	}
 
+	// Create memory entry
 	id := uuid.New().String()
 	createdAt := time.Now().Format(time.RFC3339)
 
@@ -101,10 +115,12 @@ func (m *MemoryManager) AddMemory(ctx context.Context, content string, memType M
 		"created_at": createdAt,
 	}
 
+	// Add metadata to payload
 	for k, v := range metadata {
 		payload[k] = v
 	}
 
+	// Store in vector database
 	if err := m.store.Upsert(ctx, id, vector, payload); err != nil {
 		return fmt.Errorf("store memory: %w", err)
 	}
@@ -117,14 +133,18 @@ func (m *MemoryManager) AddMemory(ctx context.Context, content string, memType M
 	return nil
 }
 
+// SearchMemory finds similar memories using vector similarity search.
+// Returns results sorted by relevance score.
 func (m *MemoryManager) SearchMemory(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	start := time.Now()
 
+	// Generate embedding for query
 	vector, err := m.embedder.Embed(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("generate embedding: %w", err)
 	}
 
+	// Search vector store
 	results, err := m.store.Search(ctx, vector, limit, nil)
 	if err != nil {
 		return nil, fmt.Errorf("search memory: %w", err)
@@ -134,6 +154,9 @@ func (m *MemoryManager) SearchMemory(ctx context.Context, query string, limit in
 	return results, nil
 }
 
+// GetContext builds a context string for the LLM.
+// Includes user profile from SQLite and relevant memories from vector store.
+// Limits total length to approximately maxTokens * 4 characters.
 func (m *MemoryManager) GetContext(ctx context.Context, query string, maxTokens int) (string, error) {
 	results, err := m.SearchMemory(ctx, query, 10)
 	if err != nil {
@@ -146,6 +169,7 @@ func (m *MemoryManager) GetContext(ctx context.Context, query string, maxTokens 
 
 	var contextParts []string
 
+	// Add user profile from database
 	if m.database != nil {
 		userSummary := m.database.GetUserSummary()
 		if userSummary != "" {
@@ -153,10 +177,12 @@ func (m *MemoryManager) GetContext(ctx context.Context, query string, maxTokens 
 		}
 	}
 
+	// Add relevant memories
 	for _, r := range results {
 		mem := r.Memory
 		memText := fmt.Sprintf("[%s] %s", mem.Type, mem.Content)
 
+		// Check if adding this would exceed limit
 		if len(contextParts) > 0 && totalLen(contextParts)+len(memText) > maxTokens*4 {
 			break
 		}
@@ -171,6 +197,7 @@ func (m *MemoryManager) GetContext(ctx context.Context, query string, maxTokens 
 	return "Relevant memories:\n" + strings.Join(contextParts, "\n\n"), nil
 }
 
+// totalLen calculates total length of string slice.
 func totalLen(parts []string) int {
 	total := 0
 	for _, p := range parts {
@@ -179,51 +206,66 @@ func totalLen(parts []string) int {
 	return total
 }
 
+// AddFact is a convenience method to add a fact memory.
 func (m *MemoryManager) AddFact(ctx context.Context, fact string, metadata map[string]string) error {
 	return m.AddMemory(ctx, fact, MemoryTypeFact, metadata)
 }
 
+// AddPreference is a convenience method to add a preference memory.
 func (m *MemoryManager) AddPreference(ctx context.Context, preference string, metadata map[string]string) error {
 	return m.AddMemory(ctx, preference, MemoryTypePreference, metadata)
 }
 
+// AddKnowledge is a convenience method to add a knowledge memory.
 func (m *MemoryManager) AddKnowledge(ctx context.Context, knowledge string, metadata map[string]string) error {
 	return m.AddMemory(ctx, knowledge, MemoryTypeKnowledge, metadata)
 }
 
+// ProcessConversation extracts and stores facts from a conversation.
+// Uses LLM to identify facts, preferences, and topics.
+// Stores results in both vector DB and SQLite.
 func (m *MemoryManager) ProcessConversation(ctx context.Context, userInput, assistantResponse string) error {
+	// Skip if no extractor or database
 	if m.extractor == nil || m.database == nil {
 		return nil
 	}
 
 	conversation := fmt.Sprintf("User: %s\nAssistant: %s", userInput, assistantResponse)
 
+	// Extract structured facts using LLM
 	facts, err := m.extractor.ExtractFacts(ctx, conversation)
 	if err != nil {
 		slog.Warn("failed to extract facts", "error", err)
 		return nil
 	}
 
+	// Store each extracted fact
 	for _, fact := range facts {
 		switch fact.Type {
 		case "fact":
+			// Store in vector DB
 			if err := m.AddFact(ctx, fact.Value, map[string]string{"key": fact.Key}); err != nil {
 				slog.Warn("failed to store fact", "error", err)
 			}
+			// Also store in SQLite profile
 			if fact.Key != "" && fact.Value != "" {
 				m.database.SetProfile(fact.Key, fact.Value)
 			}
 
 		case "preference":
+			// Store in vector DB
 			if err := m.AddPreference(ctx, fact.Value, map[string]string{"key": fact.Key, "category": fact.Category}); err != nil {
 				slog.Warn("failed to store preference", "error", err)
 			}
+			// Also store in SQLite
 			if fact.Key != "" && fact.Value != "" {
 				m.database.SetPreference(fact.Key, fact.Value, fact.Category)
 			}
 
 		case "topic":
+			// Increment topic count in SQLite
 			m.database.IncrementTopic(fact.Value)
+			// Store in vector DB
 			if err := m.AddKnowledge(ctx, "Topic: "+fact.Value, map[string]string{"topic": fact.Value}); err != nil {
 				slog.Warn("failed to store topic", "error", err)
 			}
@@ -233,12 +275,14 @@ func (m *MemoryManager) ProcessConversation(ctx context.Context, userInput, assi
 	return nil
 }
 
+// Count returns the total number of memories stored.
 func (m *MemoryManager) Count() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.memoryCount
 }
 
+// Close releases all resources (database connections, etc).
 func (m *MemoryManager) Close() error {
 	if m.store != nil {
 		m.store.Close()

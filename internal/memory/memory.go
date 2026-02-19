@@ -11,15 +11,17 @@ import (
 )
 
 // NewFileMemoryWriter creates a FileMemoryWriter rooted at the provided work directory.
+// The writer stores conversation history in daily JSONL files.
 func NewFileMemoryWriter(workDir string) *FileMemoryWriter {
 	return &FileMemoryWriter{
-		Dir:     filepath.Join(workDir, memoryDirName),
-		MaxSize: defaultMemoryMaxSize,
+		Dir:     filepath.Join(workDir, MemoryDirName),
+		MaxSize: DefaultMemoryMaxSize,
 		Clock:   time.Now,
 	}
 }
 
-// Write appends user and assistant messages to the memory store.
+// Write appends user and assistant messages to a daily JSONL file.
+// Each message is encoded as a JSON object on a single line.
 func (w *FileMemoryWriter) Write(messages []openai.ChatCompletionMessageParamUnion) error {
 	if w == nil {
 		return nil
@@ -31,20 +33,23 @@ func (w *FileMemoryWriter) Write(messages []openai.ChatCompletionMessageParamUni
 		w.Clock = time.Now
 	}
 	if w.MaxSize <= 0 {
-		w.MaxSize = defaultMemoryMaxSize
+		w.MaxSize = DefaultMemoryMaxSize
 	}
 
+	// Ensure directory exists
 	if err := os.MkdirAll(w.Dir, 0755); err != nil {
 		return err
 	}
 
 	now := w.Clock()
-	filePath := filepath.Join(w.Dir, fmt.Sprintf("%s.jsonl", now.Format(dayFileLayout)))
+	filePath := filepath.Join(w.Dir, fmt.Sprintf("%s.jsonl", now.Format(DayFileLayout)))
 
+	// Rotate if file too large
 	if err := w.rotateIfNeeded(filePath); err != nil {
 		return err
 	}
 
+	// Open file for appending
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -52,8 +57,9 @@ func (w *FileMemoryWriter) Write(messages []openai.ChatCompletionMessageParamUni
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	timestamp := now.Format(clockLayout)
+	timestamp := now.Format(ClockLayout)
 
+	// Write each message as a separate line
 	for _, msg := range messages {
 		entry, ok := buildMemoryEntry(msg, timestamp)
 		if !ok {
@@ -68,6 +74,8 @@ func (w *FileMemoryWriter) Write(messages []openai.ChatCompletionMessageParamUni
 	return nil
 }
 
+// rotateIfNeeded checks if the file exceeds MaxSize and renames it if so.
+// The archived file gets a Unix timestamp suffix.
 func (w *FileMemoryWriter) rotateIfNeeded(filePath string) error {
 	info, err := os.Stat(filePath)
 	if err != nil {
@@ -89,6 +97,8 @@ func (w *FileMemoryWriter) rotateIfNeeded(filePath string) error {
 	return nil
 }
 
+// buildMemoryEntry converts an OpenAI message to a MemoryEntry.
+// Returns false if the message has no content or unsupported role.
 func buildMemoryEntry(msg openai.ChatCompletionMessageParamUnion, timestamp string) (MemoryEntry, bool) {
 	entry := MemoryEntry{Timestamp: timestamp}
 

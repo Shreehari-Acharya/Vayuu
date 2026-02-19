@@ -10,10 +10,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Database provides SQLite-based storage for structured user data.
+// It stores user profile, preferences, and conversation topics.
 type Database struct {
 	db *sql.DB
 }
 
+// NewDatabase opens or creates a SQLite database in the work directory.
+// Returns error if database cannot be opened or initialized.
 func NewDatabase(workDir string) (*Database, error) {
 	dbPath := filepath.Join(workDir, "vayuu.db")
 
@@ -31,6 +35,8 @@ func NewDatabase(workDir string) (*Database, error) {
 	return d, nil
 }
 
+// init creates the database schema if it doesn't exist.
+// Tables: user_profile, preferences, topics
 func (d *Database) init() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS user_profile (
@@ -63,12 +69,8 @@ func (d *Database) init() error {
 	return err
 }
 
-type ProfileEntry struct {
-	Key       string
-	Value     string
-	UpdatedAt time.Time
-}
-
+// GetProfile retrieves a single profile value by key.
+// Returns empty string if key doesn't exist.
 func (d *Database) GetProfile(key string) (string, error) {
 	var value string
 	err := d.db.QueryRow("SELECT value FROM user_profile WHERE key = ?", key).Scan(&value)
@@ -81,6 +83,7 @@ func (d *Database) GetProfile(key string) (string, error) {
 	return value, nil
 }
 
+// SetProfile stores or updates a profile key-value pair.
 func (d *Database) SetProfile(key, value string) error {
 	_, err := d.db.Exec(`
 		INSERT INTO user_profile (key, value, updated_at)
@@ -90,6 +93,7 @@ func (d *Database) SetProfile(key, value string) error {
 	return err
 }
 
+// GetAllProfile returns all profile key-value pairs as a map.
 func (d *Database) GetAllProfile() (map[string]string, error) {
 	rows, err := d.db.Query("SELECT key, value FROM user_profile")
 	if err != nil {
@@ -108,6 +112,8 @@ func (d *Database) GetAllProfile() (map[string]string, error) {
 	return result, nil
 }
 
+// Preference represents a user preference with confidence score.
+// Confidence increases with each mention (0.0 to 1.0).
 type Preference struct {
 	ID         int
 	Key        string
@@ -117,6 +123,8 @@ type Preference struct {
 	UpdatedAt  time.Time
 }
 
+// SetPreference stores or updates a user preference.
+// Confidence increases by 0.1 on each update (max 1.0).
 func (d *Database) SetPreference(key, value, category string) error {
 	_, err := d.db.Exec(`
 		INSERT INTO preferences (key, value, category, updated_at)
@@ -126,37 +134,26 @@ func (d *Database) SetPreference(key, value, category string) error {
 	return err
 }
 
+// GetPreferences returns all preferences for a specific category,
+// sorted by confidence (highest first).
 func (d *Database) GetPreferences(category string) ([]Preference, error) {
-	rows, err := d.db.Query(`
-		SELECT id, key, value, category, confidence, updated_at 
-		FROM preferences 
-		WHERE category = ?
-		ORDER BY confidence DESC
-	`, category)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result []Preference
-	for rows.Next() {
-		var p Preference
-		var updatedAt string
-		if err := rows.Scan(&p.ID, &p.Key, &p.Value, &p.Category, &p.Confidence, &updatedAt); err != nil {
-			return nil, err
-		}
-		p.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
-		result = append(result, p)
-	}
-	return result, nil
+	return d.queryPreferences("WHERE category = ?", category)
 }
 
+// GetAllPreferences returns all preferences sorted by confidence.
 func (d *Database) GetAllPreferences() ([]Preference, error) {
-	rows, err := d.db.Query(`
-		SELECT id, key, value, category, confidence, updated_at 
-		FROM preferences 
-		ORDER BY confidence DESC
-	`)
+	return d.queryPreferences("", nil)
+}
+
+// queryPreferences is a helper to query preferences with optional filter.
+func (d *Database) queryPreferences(where string, args ...any) ([]Preference, error) {
+	query := "SELECT id, key, value, category, confidence, updated_at FROM preferences"
+	if where != "" {
+		query += " " + where
+	}
+	query += " ORDER BY confidence DESC"
+
+	rows, err := d.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +172,8 @@ func (d *Database) GetAllPreferences() ([]Preference, error) {
 	return result, nil
 }
 
+// IncrementTopic increments the mention count for a topic.
+// Creates the topic if it doesn't exist.
 func (d *Database) IncrementTopic(name string) error {
 	_, err := d.db.Exec(`
 		INSERT INTO topics (name, last_mentioned)
@@ -186,10 +185,14 @@ func (d *Database) IncrementTopic(name string) error {
 	return err
 }
 
-func (d *Database) GetTopTopics(limit int) ([]struct {
+// Topic represents a conversation topic with mention count.
+type Topic struct {
 	Name     string
 	Mentions int
-}, error) {
+}
+
+// GetTopTopics returns the most mentioned topics.
+func (d *Database) GetTopTopics(limit int) ([]Topic, error) {
 	rows, err := d.db.Query(`
 		SELECT name, mentions FROM topics 
 		ORDER BY mentions DESC LIMIT ?
@@ -199,15 +202,9 @@ func (d *Database) GetTopTopics(limit int) ([]struct {
 	}
 	defer rows.Close()
 
-	var result []struct {
-		Name     string
-		Mentions int
-	}
+	var result []Topic
 	for rows.Next() {
-		var t struct {
-			Name     string
-			Mentions int
-		}
+		var t Topic
 		if err := rows.Scan(&t.Name, &t.Mentions); err != nil {
 			return nil, err
 		}
@@ -216,10 +213,13 @@ func (d *Database) GetTopTopics(limit int) ([]struct {
 	return result, nil
 }
 
+// Close releases the database connection.
 func (d *Database) Close() error {
 	return d.db.Close()
 }
 
+// GetUserSummary returns a human-readable summary of user data.
+// Used to include in LLM context.
 func (d *Database) GetUserSummary() string {
 	profile, _ := d.GetAllProfile()
 	prefs, _ := d.GetAllPreferences()
