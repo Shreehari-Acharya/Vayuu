@@ -1,12 +1,11 @@
 package agent
 
 import (
-	"regexp"
-	"strings"
-
 	"github.com/openai/openai-go/v3"
 )
 
+// toolCallsToParams converts OpenAI tool call structs to the parameter format
+// expected by the API for sending tool results back to the model.
 func toolCallsToParams(calls []openai.ChatCompletionMessageToolCallUnion) []openai.ChatCompletionMessageToolCallUnionParam {
 	out := make([]openai.ChatCompletionMessageToolCallUnionParam, 0, len(calls))
 
@@ -23,21 +22,4 @@ func toolCallsToParams(calls []openai.ChatCompletionMessageToolCallUnion) []open
 	}
 
 	return out
-}
-
-var (
-	thinkBlockRE         = regexp.MustCompile(`(?s)<think>.*?</think>`)
-	orphanedThinkEndRE   = regexp.MustCompile(`(?s)^.*?</think>\s*`)
-	orphanedThinkStartRE = regexp.MustCompile(`(?s)<think>.*$`)
-	multiBlankLinesRE    = regexp.MustCompile(`\n\s*\n\s*\n+`)
-)
-
-// cleanThinkingTags removes <think> tags and their content from LLM responses.
-func cleanThinkingTags(content string) string {
-	content = thinkBlockRE.ReplaceAllString(content, "")
-	content = orphanedThinkEndRE.ReplaceAllString(content, "")
-	content = orphanedThinkStartRE.ReplaceAllString(content, "")
-	content = multiBlankLinesRE.ReplaceAllString(content, "\n\n")
-
-	return strings.TrimSpace(content)
 }
