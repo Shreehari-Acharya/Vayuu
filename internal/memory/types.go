@@ -1,5 +1,11 @@
 package memory
 
+import (
+	"time"
+	
+	"github.com/openai/openai-go/v3"
+)
+
 type MemoryType string
 
 const (
@@ -28,6 +34,24 @@ type Config struct {
 	QdrantURL      string
 	VectorDim      int
 	CollectionName string
+}
+
+
+type MemoryWriter interface {
+	Write(messages []openai.ChatCompletionMessageParamUnion) error
+}
+
+// FileMemoryWriter appends conversation history to daily JSONL files.
+type FileMemoryWriter struct {
+	Dir     string
+	MaxSize int64
+	Clock   func() time.Time
+}
+
+type MemoryEntry struct {
+	Timestamp string `json:"timestamp"`
+	Role      string `json:"role"`
+	Content   string `json:"content"`
 }
 
 func DefaultConfig() *Config {
