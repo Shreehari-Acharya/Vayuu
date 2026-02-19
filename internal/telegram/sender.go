@@ -28,14 +28,97 @@ func (tb *Bot) sendTypingAction(ctx context.Context) error {
 	return err
 }
 
-func (tb *Bot) sendFileToCurrentChat(filePath, caption string) error {
+func (tb *Bot) SendContent(content, caption string) error {
 	if tb.currentChatID == 0 {
 		return fmt.Errorf("no active chat")
 	}
-	return tb.sendDocument(context.Background(), filePath, caption)
+
+	detectedType, err := DetectContentType(content)
+	if err != nil {
+		return fmt.Errorf("detect content type: %w", err)
+	}
+
+	contentType, err := ValidateContentType("", detectedType)
+	if err != nil {
+		slog.Warn("content type validation failed, using detected", "error", err)
+		contentType = detectedType
+	}
+
+	slog.Debug("sending content", "type", contentType, "content_len", len(content))
+
+	switch contentType {
+	case ContentTypeImage:
+		return tb.sendPhoto(content, caption)
+	case ContentTypeVideo:
+		return tb.sendVideo(content, caption)
+	case ContentTypeDoc:
+		return tb.sendDocument(content, caption)
+	default:
+		return tb.sendDocument(content, caption)
+	}
 }
 
-func (tb *Bot) sendDocument(ctx context.Context, filePath, caption string) error {
+func (tb *Bot) sendPhoto(filePath, caption string) error {
+	if err := validateFileForUpload(filePath); err != nil {
+		return err
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer f.Close()
+
+	params := &bot.SendPhotoParams{
+		ChatID: tb.currentChatID,
+		Photo: &models.InputFileUpload{
+			Filename: filepath.Base(filePath),
+			Data:     f,
+		},
+	}
+	if caption != "" {
+		params.Caption = caption
+	}
+
+	if _, err := tb.bot.SendPhoto(context.Background(), params); err != nil {
+		return fmt.Errorf("send photo: %w", err)
+	}
+
+	slog.Info("photo sent", "chat_id", tb.currentChatID, "path", filePath)
+	return nil
+}
+
+func (tb *Bot) sendVideo(filePath, caption string) error {
+	if err := validateFileForUpload(filePath); err != nil {
+		return err
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer f.Close()
+
+	params := &bot.SendVideoParams{
+		ChatID: tb.currentChatID,
+		Video: &models.InputFileUpload{
+			Filename: filepath.Base(filePath),
+			Data:     f,
+		},
+	}
+	if caption != "" {
+		params.Caption = caption
+	}
+
+	if _, err := tb.bot.SendVideo(context.Background(), params); err != nil {
+		return fmt.Errorf("send video: %w", err)
+	}
+
+	slog.Info("video sent", "chat_id", tb.currentChatID, "path", filePath)
+	return nil
+}
+
+func (tb *Bot) sendDocument(filePath, caption string) error {
 	if err := validateFileForUpload(filePath); err != nil {
 		return err
 	}
@@ -57,21 +140,10 @@ func (tb *Bot) sendDocument(ctx context.Context, filePath, caption string) error
 		params.Caption = caption
 	}
 
-	if _, err := tb.bot.SendDocument(ctx, params); err != nil {
+	if _, err := tb.bot.SendDocument(context.Background(), params); err != nil {
 		return fmt.Errorf("send document: %w", err)
 	}
 
-	slog.Info("file sent", "chat_id", tb.currentChatID, "path", filePath)
-	return nil
-}
-
-func validateFileForUpload(path string) error {
-	info, err := os.Stat(path)
-	if err != nil {
-		return fmt.Errorf("file does not exist: %w", err)
-	}
-	if info.Size() > maxTelegramFileSize {
-		return fmt.Errorf("file too large (%.2f MB, max 50 MB)", float64(info.Size())/(1024*1024))
-	}
+	slog.Info("document sent", "chat_id", tb.currentChatID, "path", filePath)
 	return nil
 }
