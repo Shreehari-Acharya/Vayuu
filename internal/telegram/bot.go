@@ -28,7 +28,7 @@ func NewBot(cfg *config.Config, agentInstance *agent.Agent, toolEnv *tools.ToolE
 	}
 	tb.bot = b
 
-	toolEnv.SetFileSender(tb.sendFileToCurrentChat)
+	toolEnv.SetFileSender(tb.SendContent)
 	slog.Info("telegram bot initialized")
 
 	return tb, nil
