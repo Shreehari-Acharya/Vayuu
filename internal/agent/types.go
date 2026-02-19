@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"github.com/Shreehari-Acharya/vayuu/internal/memory"
 	"github.com/openai/openai-go/v3"
 )
 
@@ -17,6 +18,7 @@ type Agent struct {
 	systemPrompt string
 	workDir      string
 	memoryWriter MemoryWriter
+	memoryMgr    *memory.MemoryManager
 }
 
 type MemoryEntry struct {
