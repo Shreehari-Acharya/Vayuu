@@ -8,6 +8,7 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
+// handleMessage is the main handler for incoming Telegram messages. It checks for allowed usernames, updates the current chat ID, sends a typing action, and processes the message using the agent, sending back the response to the user.
 func (tb *Bot) handleMessage(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return

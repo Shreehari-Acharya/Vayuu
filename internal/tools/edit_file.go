@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// editFile is a tool function that edits a file by replacing the first occurrence of a specified old string with a new string. It validates the file path, reads the file content, performs the replacement, and writes the updated content back to the file. The function returns a summary of the edit operation, including the number of lines replaced and the change in file size.
 func (e *ToolEnv) editFile(args map[string]any) string {
 	path, okPath := args["path"].(string)
 	oldStr, okOld := args["old_string"].(string)

@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// validateFileForUpload checks if the file at the given path exists and is within the allowed size limit for Telegram uploads (50 MB). It returns an error if the file does not exist or exceeds the size limit.
 func validateFileForUpload(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {

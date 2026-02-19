@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// readFile is a tool function that reads the content of a file or multiple files specified by their paths. It validates the file paths, checks for file size limits, and returns the content of the file(s) or any errors encountered during the process. The function supports both single string paths and arrays of string paths, providing formatted output for multiple files.
 func (e *ToolEnv) readFile(args map[string]any) string {
 	if pathStr, ok := args["path"].(string); ok {
 		return e.readSingleFile(pathStr)
@@ -26,6 +27,7 @@ func (e *ToolEnv) readFile(args map[string]any) string {
 	return "error: path must be a string or array of strings"
 }
 
+// readSingleFile is a helper function that reads the content of a single file specified by its relative path. It validates the file path, checks if it's a directory, verifies the file size against the defined limit, and returns the file content or any errors encountered during the process.
 func (e *ToolEnv) readSingleFile(relativePath string) string {
 	fullPath, err := e.validatePath(relativePath)
 	if err != nil {

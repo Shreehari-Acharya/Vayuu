@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// ContentType represents the type of content being sent to Telegram (e.g., image, document, video).
 func DetectContentType(pathOrContent string) (ContentType, error) {
 	ext := strings.ToLower(filepath.Ext(pathOrContent))
 
@@ -21,10 +22,12 @@ func DetectContentType(pathOrContent string) (ContentType, error) {
 	}
 }
 
+// ContentType defines the type of content being sent to Telegram, such as image, document, or video.
 func (c ContentType) String() string {
 	return string(c)
 }
 
+// IsValid checks if the ContentType is one of the recognized types (image, document, video).
 func (c ContentType) IsValid() bool {
 	switch c {
 	case ContentTypeImage, ContentTypeDoc, ContentTypeVideo:
@@ -34,6 +37,7 @@ func (c ContentType) IsValid() bool {
 	}
 }
 
+// EncodeContentEntries encodes a slice of MemoryEntry into the provided encoder, skipping entries with empty content.
 func ValidateContentType(hint ContentType, detected ContentType) (ContentType, error) {
 	if !hint.IsValid() {
 		return detected, fmt.Errorf("invalid content type hint: %s", hint)

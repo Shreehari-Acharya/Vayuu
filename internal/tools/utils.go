@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// validatePath is a helper function that validates and resolves a relative file path against the ToolEnv's working directory. It checks for empty paths, handles paths starting with "~/", and ensures that the resolved path does not allow for path traversal outside of the working directory. The function returns the cleaned full path or an error if the validation fails.
 func (e *ToolEnv) validatePath(relativePath string) (string, error) {
 	if strings.TrimSpace(relativePath) == "" {
 		return "", fmt.Errorf("path must not be empty")
@@ -28,11 +29,14 @@ func (e *ToolEnv) validatePath(relativePath string) (string, error) {
 	return fullPath, nil
 }
 
+// isDirectory checks if the given path is a directory. It returns true if the path exists and is a directory, and false otherwise.
 func isDirectory(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }
 
+
+// fileSize returns the size of the file at the given path. It returns the file size in bytes or an error if the file cannot be accessed.
 func fileSize(path string) (int64, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -41,6 +45,7 @@ func fileSize(path string) (int64, error) {
 	return info.Size(), nil
 }
 
+// formatBytes is a helper function that formats a byte size into a human-readable string with appropriate units (B, KB, MB, GB). It takes the size in bytes and returns a formatted string with two decimal places for larger units.
 func formatBytes(bytes int64) string {
 	const (
 		kb = 1024

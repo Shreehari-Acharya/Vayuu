@@ -11,6 +11,7 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
+// sendMessage sends a text message to the current chat ID using the Telegram bot API, with MarkdownV1 parsing enabled.
 func (tb *Bot) sendMessage(ctx context.Context, text string) error {
 	_, err := tb.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ParseMode: models.ParseModeMarkdownV1,
@@ -20,6 +21,7 @@ func (tb *Bot) sendMessage(ctx context.Context, text string) error {
 	return err
 }
 
+// SendContent is a public method that allows sending various types of content (images, videos, documents) to the current chat. It detects the content type, validates it, and calls the appropriate method to send the content using the Telegram bot API.
 func (tb *Bot) sendTypingAction(ctx context.Context) error {
 	_, err := tb.bot.SendChatAction(ctx, &bot.SendChatActionParams{
 		ChatID: tb.currentChatID,
@@ -28,6 +30,7 @@ func (tb *Bot) sendTypingAction(ctx context.Context) error {
 	return err
 }
 
+// SendContent is a public method that allows sending various types of content (images, videos, documents) to the current chat. It detects the content type, validates it, and calls the appropriate method to send the content using the Telegram bot API.
 func (tb *Bot) SendContent(content, caption string) error {
 	if tb.currentChatID == 0 {
 		return fmt.Errorf("no active chat")
@@ -58,6 +61,7 @@ func (tb *Bot) SendContent(content, caption string) error {
 	}
 }
 
+// sendPhoto sends an image file to the current chat ID using the Telegram bot API, with an optional caption.
 func (tb *Bot) sendPhoto(filePath, caption string) error {
 	if err := validateFileForUpload(filePath); err != nil {
 		return err
@@ -88,6 +92,7 @@ func (tb *Bot) sendPhoto(filePath, caption string) error {
 	return nil
 }
 
+// sendVideo sends a video file to the current chat ID using the Telegram bot API, with an optional caption.
 func (tb *Bot) sendVideo(filePath, caption string) error {
 	if err := validateFileForUpload(filePath); err != nil {
 		return err
@@ -118,6 +123,7 @@ func (tb *Bot) sendVideo(filePath, caption string) error {
 	return nil
 }
 
+// sendDocument sends a document file to the current chat ID using the Telegram bot API, with an optional caption.
 func (tb *Bot) sendDocument(filePath, caption string) error {
 	if err := validateFileForUpload(filePath); err != nil {
 		return err

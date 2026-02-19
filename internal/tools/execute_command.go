@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// executeCommand is a tool function that executes a shell command or an array of shell commands. It validates the input, runs the command(s) in the specified working directory, and returns the output or any errors encountered during execution. The function also handles command timeouts and limits the size of the output to prevent excessive data from being returned.
 func (e *ToolEnv) executeCommand(args map[string]any) string {
 	if cmdStr, ok := args["command"].(string); ok {
 		return e.runCommand(cmdStr)
@@ -20,6 +21,7 @@ func (e *ToolEnv) executeCommand(args map[string]any) string {
 	return "error: command must be a string or array of strings"
 }
 
+// runMultipleCommands executes multiple shell commands sequentially, collecting their outputs and errors. It validates each command, runs them in the specified working directory, and returns a combined result that includes the output of each command or any errors encountered.
 func (e *ToolEnv) runMultipleCommands(cmds []any) string {
 	if len(cmds) == 0 {
 		return "error: command array is empty"
@@ -48,6 +50,7 @@ func (e *ToolEnv) runMultipleCommands(cmds []any) string {
 	return strings.Join(results, "\n\n")
 }
 
+// runCommand executes a single shell command with a timeout and output size limit, returning the command's output or any errors encountered during execution.
 func (e *ToolEnv) runCommand(cmd string) string {
 	if strings.TrimSpace(cmd) == "" {
 		return "error: command is empty"

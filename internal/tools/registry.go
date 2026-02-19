@@ -1,5 +1,6 @@
 package tools
 
+// This file defines the registry of tools available to the agent, including their definitions and handlers. It provides a function to register all tools with the agent and builds the tool definitions based on the provided ToolEnv.
 func buildToolDefs(env *ToolEnv) []toolDef {
 	return []toolDef{
 		{

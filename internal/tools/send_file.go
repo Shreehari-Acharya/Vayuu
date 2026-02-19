@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// sendFile is a tool function that sends a file to a chat using the configured FileSender. It validates the file path, checks if the file exists and is not a directory, and then uses the FileSender to send the file with an optional caption. The function returns a success message or any errors encountered during the process.
 func (e *ToolEnv) sendFile(args map[string]any) string {
 	pathStr, ok := args["path"].(string)
 	if !ok {

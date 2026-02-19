@@ -11,6 +11,8 @@ import (
 	"github.com/go-telegram/bot"
 )
 
+// Bot encapsulates the Telegram bot functionality, 
+// integrating with the agent and tool environment to handle incoming messages and execute tools as needed.
 func NewBot(cfg *config.Config, agentInstance *agent.Agent, toolEnv *tools.ToolEnv) (*Bot, error) {
 	tb := &Bot{
 		agent:   agentInstance,
@@ -34,11 +36,13 @@ func NewBot(cfg *config.Config, agentInstance *agent.Agent, toolEnv *tools.ToolE
 	return tb, nil
 }
 
+// Start begins the bot's message processing loop, allowing it to receive and respond to messages from users.
 func (tb *Bot) Start(ctx context.Context) {
 	slog.Info("telegram bot started, listening for messages")
 	tb.bot.Start(ctx)
 }
 
+// setCurrentChatID updates the current chat ID in both the Bot struct and the tool environment, ensuring that tools have access to the correct chat context when sending messages or files.
 func (tb *Bot) setCurrentChatID(chatID int64) {
 	tb.currentChatID = chatID
 	tb.toolEnv.SetCurrentChatID(chatID)
